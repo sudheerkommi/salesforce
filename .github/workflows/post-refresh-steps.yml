@@ -38,7 +38,7 @@ jobs:
       - name: Execute Apex Script and Capture JSON Output
         id: execute_apex
         run: |
-          result=$(sf apex execute -u "${{ github.event.inputs.environment }}" -f scripts/myApex.apex --json)
+          result=$(sf apex execute -u sudheer.kommi@icloud.com.trialplay.production-sfp  -f scripts/test1.apex --json)
           echo "$result" > apex_output.json
           echo "Raw JSON Response:"
           echo "$result"
