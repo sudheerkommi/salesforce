@@ -5,13 +5,13 @@ on:
     inputs:
       secret:
         description: 'Salesforce Connected App Consumer Key'
-        required: true
+        required: false
       environment:
         description: 'Salesforce alias for the org'
         required: true
       username:
         description: 'Salesforce username'
-        required: true
+        required: false
 
 jobs:
   sf-env-setup:
@@ -35,17 +35,7 @@ jobs:
         run: echo 'y' | sf plugins install sfdx-git-delta
 
       - name: Install SFPowerkit Plugin
-        run: sf plugins install sfpowerkit -y
-
-      - name: Authenticate to Salesforce Sandbox (JWT)
-        run: |
-          sfdx auth:jwt:grant \
-            -r https://test.salesforce.com \
-            -i "${{ github.event.inputs.secret }}" \
-            -f "${{ github.workspace }}/assets/devopskeys/server.key" \
-            -u "${{ github.event.inputs.username }}" \
-            -d \
-            -a "${{ github.event.inputs.environment }}"
+        run: echo 'y' | sf plugins install sfpowerkit 
 
       - name: Verify SFPowerkit is working
         run: sfpowerkit:org:info -u "${{ github.event.inputs.environment }}"
