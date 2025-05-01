@@ -1,4 +1,3 @@
-
 name: SF Environment Setup
 
 on:
@@ -26,7 +25,6 @@ jobs:
         run: |
           npm install -g @salesforce/cli@2.49.7
           sf --version
-
       - name: Install SGD Delta Plugin
         run: echo 'y' | sf plugins install sfdx-git-delta
 
@@ -40,6 +38,6 @@ jobs:
         id: execute_apex
         run: |
           result=$(sf apex run --file ${GITHUB_WORKSPACE}/scripts/test1.apex --target-org sudheer.kommi@icloud.com.trialplay.production-sfp)
-  
-
-
+          echo "$result" > apex_output.json
+          echo "Raw JSON Response:"
+          echo "$result"
