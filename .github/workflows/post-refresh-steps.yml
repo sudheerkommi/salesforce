@@ -3,15 +3,10 @@ name: SF Environment Setup
 on:
   workflow_dispatch:
     inputs:
-      secret:
-        description: 'Salesforce Connected App Consumer Key'
-        required: false
       environment:
-        description: 'Salesforce alias for the org'
+        description: 'Salesforce org'
         required: true
-      username:
-        description: 'Salesforce username'
-        required: false
+ 
 
 jobs:
   sf-env-setup:
@@ -34,9 +29,5 @@ jobs:
       - name: Install SGD Delta Plugin
         run: echo 'y' | sf plugins install sfdx-git-delta
 
-      - name: Install SFPowerkit Plugin
-        run: echo 'y' | sf plugins install sfpowerkit 
 
-      - name: Verify SFPowerkit is working
-        run: sfpowerkit:org:info -u "${{ github.event.inputs.environment }}"
 
