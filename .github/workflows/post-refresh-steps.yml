@@ -31,7 +31,7 @@ jobs:
 
               # === Authenticate sandbox. ===
       - name: Authenticate Sandbox
-        run: sf auth jwt grant -r https://test.salesforce.com -i 3MVG96yD8KRvY2.EPYjJWrUD7lWhuewzJ6Evh8ZyScUaUEqfgvZPy3MDeUW0iy9uRA.dwXNa4sthpSjQZpqNj  -f ${GITHUB_WORKSPACE}/assets/devopskeys/server.key -o 
+        run: sf auth jwt grant -r https://login.salesforce.com -i 3MVG96yD8KRvY2.EPYjJWrUD7lWhuewzJ6Evh8ZyScUaUEqfgvZPy3MDeUW0iy9uRA.dwXNa4sthpSjQZpqNj  -f ${GITHUB_WORKSPACE}/assets/devopskeys/server.key -o 
              sudheer.kommi@icloud.com.trialplay.production-sfp -d 
 
       - name: Install jq
