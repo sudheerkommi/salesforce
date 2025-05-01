@@ -29,5 +29,8 @@ jobs:
       - name: Install SGD Delta Plugin
         run: echo 'y' | sf plugins install sfdx-git-delta
 
+      - name: Install jq
+        run: sudo apt-get install jq
+
 
 
