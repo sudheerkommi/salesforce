@@ -35,7 +35,7 @@ jobs:
         run: echo 'y' | sf plugins install sfdx-git-delta
 
       - name: Install SFPowerkit Plugin
-        run: sf plugins install sfpowerkit
+        run: sf plugins install sfpowerkit -y
 
       - name: Authenticate to Salesforce Sandbox (JWT)
         run: |
