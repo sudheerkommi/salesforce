@@ -1,3 +1,4 @@
+
 name: SF Environment Setup
 
 on:
@@ -35,19 +36,10 @@ jobs:
              sudheer.kommi@icloud.com.trialplay.production-sfp -d 
 
 
-      - name: Executing  Apex Script and Capture JSON Output
+      - name: Execute Apex Script and Capture JSON Output
         id: execute_apex
         run: |
-              result=$(sf apex run --file ${GITHUB_WORKSPACE}/scripts/test1.apex --target-org my-org --json)
-              echo "$result" > apex_output.json
-              cat apex_output.json | jq
-      - name: Parse and Log Apex Debug Output
-        run: |
-          success=$(jq -r '.result.success' apex_output.json)
-          echo "✅ Script Success: $success"
-          
-
-
-
+          result=$(sf apex run --file ${GITHUB_WORKSPACE}/scripts/test1.apex --target-org sudheer.kommi@icloud.com.trialplay.production-sfp)
+  
 
 
