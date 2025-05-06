@@ -4,14 +4,18 @@ on:
   workflow_dispatch:
     inputs:
       Environment:
-        description: 'Salesforce org'
+        description: 'GitHub Environment name (e.g., sandbox, prod)'
         required: true
         type: string
- 
 
 jobs:
   sf-env-setup:
     runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.Environment }}
+
+    env:
+      ORGNAME: ${{ github.event.inputs.Environment }}
+      USERNAME: ${{ vars.USERNAME }}
 
     steps:
       - name: Checkout code
@@ -26,19 +30,12 @@ jobs:
         run: |
           npm install -g @salesforce/cli@2.49.7
           sf --version
-      - name: Install SGD Delta Plugin
+
+      - name: Install sfdx-git-delta Plugin
         run: echo 'y' | sf plugins install sfdx-git-delta
 
-      # === Authenticate sandbox. ===
-      - name: Authenticate Sandbox
-        run: sf auth jwt grant -r https://login.salesforce.com -i 3MVG96yD8KRvY2.EPYjJWrUD7lWhuewzJ6Evh8ZyScUaUEqfgvZPy3MDeUW0iy9uRA.dwXNa4sthpSjQZpqNj   -f ${GITHUB_WORKSPACE}/assets/devopskeys/server.key -o 
-             sudheer.kommi@icloud.com.trialplay.production-sfp -d 
-
-
-      - name: Execute Apex Script and Capture JSON Output
-        id: execute_apex
+      - name: Authenticate with Salesforce using JWT
         run: |
-          result=$(sf apex run --file ${GITHUB_WORKSPACE}/scripts/test1.apex --target-org sudheer.kommi@icloud.com.trialplay.production-sfp )
-          echo "$result" > apex_output.json
-          echo "Raw JSON Response:"
-          echo "$result"
+          sf auth jwt grant \
+            --client-id ${{ secrets.CONSUMERKEY }} \
+            --jwt-key-file ${GITHUB_WORKSPACE}/assets/devopskeys_
