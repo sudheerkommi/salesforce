@@ -3,9 +3,10 @@ name: SF Environment Setup
 on:
   workflow_dispatch:
     inputs:
-      environment:
+      Environment:
         description: 'Salesforce org'
         required: true
+        type: string
  
 
 jobs:
