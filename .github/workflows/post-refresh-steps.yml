@@ -11,7 +11,7 @@ on:
 jobs:
   sf-env-setup:
     runs-on: ubuntu-latest
-    environment: ${{ github.event.inputs.Environment }}
+    environment: ${{ github.event.inputs.Environment }}  # This sets the environment based on input
 
     env:
       ORGNAME: ${{ github.event.inputs.Environment }}
@@ -38,4 +38,16 @@ jobs:
         run: |
           sf auth jwt grant \
             --client-id ${{ secrets.CONSUMERKEY }} \
-            --jwt-key-file ${GITHUB_WORKSPACE}/assets/devopskeys_
+            --jwt-key-file ${GITHUB_WORKSPACE}/assets/devopskeys/server.key \
+            --username ${{ env.USERNAME }} \
+            --instance-url https://login.salesforce.com \
+            --alias ${{ env.ORGNAME }}
+
+      - name: Execute Apex Script and Capture JSON Output
+        id: execute_apex
+        run: |
+          echo "Running Apex script on org: ${{ env.ORGNAME }}"
+          result=$(sf apex run --file ${GITHUB_WORKSPACE}/scripts/test1.apex --target-org ${{ env.ORGNAME }} --json)
+          echo "$result" > apex_output.json
+          echo "Raw JSON Response:"
+          cat apex_output.json
