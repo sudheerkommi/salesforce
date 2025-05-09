@@ -53,16 +53,23 @@ jobs:
           echo "Raw JSON Response:"
           cat apex_output.json
 
+      - name: Create Custom Metadata Folder Structure
+        run: |
+          # Create folder structure if it doesn't exist
+          mkdir -p SandboxEnvironments/production-sfp/force-app/main/default/customMetadata
+
+
       - name: Retrieve Custom Metadata Records
         run: |
           echo "Retrieving Custom Metadata Records from org: ${{ env.ORGNAME }}"
           sf project retrieve start --metadata CustomMetadata:CmdtCountry --target-org ${{ env.ORGNAME }}
+      
         
       - name: Commit Retrieved Custom Metadata to Repository
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add force-app/main/default/customMetadata/*
+          git add SandboxEnvironments/production-sfp/force-app/main/default/customMetadata/*
           git commit -m "Retrieve Custom Metadata records for CmdtCountry from ${{ env.ORGNAME }}"
           git push origin main
           
