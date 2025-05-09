@@ -55,6 +55,24 @@ jobs:
 
       - name: sf deploy metadata
         run: |
-          sf project deploy start --source-dir ${GITHUB_WORKSPACE}/SandboxRefreshEnvironments/production-sfp/force-app/main/default/customMetadata --target-org ${{ github.event.inputs.Environment }} --ignore-conflicts --json
+          echo "Deploying metadata to ${{ github.event.inputs.Environment }}..."
+          
+          # Verify environment exists
+          sf org display --target-org ${{ github.event.inputs.Environment }} --json > /dev/null 2>&1 || {
+            echo "::error::Environment '${{ github.event.inputs.Environment }}' does not exist or is not accessible."
+            echo "Run 'sf org list' to see available environments."
+            exit 1
+          }
+          
+          # Deploy metadata
+          sf project deploy start --source-dir ${GITHUB_WORKSPACE}/SandboxRefreshEnvironments/production-sfp/force-app/main/default/customMetadata --target-org ${{ github.event.inputs.Environment }} --ignore-conflicts --json | tee deploy_result.json
+          
+          # Check for component failures even if command succeeded
+          if [ $(jq -r '.status // "Failed"' deploy_result.json) == "Failed" ]; then
+            echo "::warning::Deployment had component failures:"
+            jq -r '.result.details.componentFailures[] | .problem' deploy_result.json 2>/dev/null || echo "Could not parse component failures."
+          else
+            echo "✅ Metadata deployment completed successfully"
+          fi
           
           
