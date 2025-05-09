@@ -33,6 +33,21 @@ jobs:
 
       - name: Install sfdx-git-delta Plugin
         run: echo 'y' | sf plugins install sfdx-git-delta
+        
+      - name: Check input environment exists
+        run: |
+          # Get all available environments from the repository
+          AVAILABLE_ENVIRONMENTS=($(gh api repos/${{ github.repository }}/environments --jq '.environments[].name' | tr '\n' ' '))
+          echo "Available environments: ${AVAILABLE_ENVIRONMENTS[@]}"
+          
+          # Check if the input environment exists in the available environments
+          if [[ ! " ${AVAILABLE_ENVIRONMENTS[@]} " =~ " ${{ github.event.inputs.Environment }} " ]]; then
+            echo "::error::Environment '${{ github.event.inputs.Environment }}' does not exist in this repository."
+            echo "Available environments: ${AVAILABLE_ENVIRONMENTS[@]}"
+            exit 1
+          fi
+          
+          echo "✅ Environment '${{ github.event.inputs.Environment }}' exists."
                       
       - name: Authenticate with Salesforce using JWT
         run: |
@@ -43,17 +58,7 @@ jobs:
             --instance-url https://login.salesforce.com \
             --alias ${{ env.ORGNAME }}
 
-      - name: check environment exists
-        run: |
-            sf org display --target-org ${{ github.event.inputs.Environment }} --json > /dev/null 2>&1 || {
-              echo "::error::Environment '${{ github.event.inputs.Environment }}' does not exist or is not accessible."
-              
-              # Simply list orgs with the CLI's built-in formatting
-              echo "Available environments:"
-              sf org list --no-prompt 2>/dev/null || echo "No authenticated orgs found."
-              
-              exit 1
-            }
+
 
       - name: Execute Apex Script and Capture JSON Output
         id: execute_apex
