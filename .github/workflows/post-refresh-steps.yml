@@ -76,7 +76,7 @@ jobs:
           echo "Deploying metadata to ${{ github.event.inputs.Environment }}..."
                     
           # Deploy metadata
-          sf project deploy start --source-dir ${GITHUB_WORKSPACE}/SandboxRefreshEnvironments/production-sfp/force-app/main/default/customMetadata --target-org ${{ github.event.inputs.Environment }} --ignore-conflicts --json | tee deploy_result.json
+          sf project deploy start --source-dir ${GITHUB_WORKSPACE}/SandboxRefreshEnvironments/${{ github.event.inputs.Environment }}/force-app/main/default/customMetadata --target-org ${{ github.event.inputs.Environment }} --ignore-conflicts --json | tee deploy_result.json
           
           # Check for component failures even if command succeeded
           if [ $(jq -r '.status // "Failed"' deploy_result.json) == "Failed" ]; then
