@@ -34,20 +34,22 @@ jobs:
       - name: Install sfdx-git-delta Plugin
         run: echo 'y' | sf plugins install sfdx-git-delta
         
-      - name: Check input environment exists
+      - name: Check if environment exists
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          INPUT_ENV_NAME: ${{ github.event.inputs.env_name }}
         run: |
-          # Get all available environments from the repository
-          AVAILABLE_ENVIRONMENTS=($(gh api repos/${{ github.repository }}/environments --jq '.environments[].name' | tr '\n' ' '))
-          echo "Available environments: ${AVAILABLE_ENVIRONMENTS[@]}"
-          
-          # Check if the input environment exists in the available environments
-          if [[ ! " ${AVAILABLE_ENVIRONMENTS[@]} " =~ " ${{ github.event.inputs.Environment }} " ]]; then
-            echo "::error::Environment '${{ github.event.inputs.Environment }}' does not exist in this repository."
-            echo "Available environments: ${AVAILABLE_ENVIRONMENTS[@]}"
-            exit 1
+          echo "Checking if environment '$INPUT_ENV_NAME' exists..."
+
+          ENV_LIST=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+            https://api.github.com/repos/${{ github.repository }}/environments)
+
+          if echo "$ENV_LIST" | jq -r '.environments[].name' | grep -qx "$INPUT_ENV_NAME"; then
+            echo "✅ Environment '$INPUT_ENV_NAME' exists in the repository."
+          else
+            echo "❌ Environment '$INPUT_ENV_NAME' does NOT exist."
+            exit 1  # Fail the job if not found
           fi
-          
-          echo "✅ Environment '${{ github.event.inputs.Environment }}' exists."
                       
       - name: Authenticate with Salesforce using JWT
         run: |
