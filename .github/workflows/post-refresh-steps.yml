@@ -55,6 +55,6 @@ jobs:
 
       - name: sf deploy metadata
         run: |
-          sf project deploy start --source-dir /SandboxRefreshEnvironments/production-sfp/force-app/main/default/customMetadata --target-org production-sfp --ignore-conflicts --json
+          sf project deploy start --source-dir ${GITHUB_WORKSPACE}/SandboxRefreshEnvironments/production-sfp/force-app/main/default/customMetadata --target-org production-sfp --ignore-conflicts --json
           
           
