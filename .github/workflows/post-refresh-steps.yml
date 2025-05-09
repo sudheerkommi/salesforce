@@ -33,6 +33,15 @@ jobs:
 
       - name: Install sfdx-git-delta Plugin
         run: echo 'y' | sf plugins install sfdx-git-delta
+                      
+      - name: Authenticate with Salesforce using JWT
+        run: |
+          sf auth jwt grant \
+            --client-id ${{ secrets.CONSUMER_KEY }} \
+            --jwt-key-file ${GITHUB_WORKSPACE}/assets/devopskeys/server.key \
+            --username ${{ env.USERNAME }} \
+            --instance-url https://login.salesforce.com \
+            --alias ${{ env.ORGNAME }}
 
       - name: check environment exists
         run: |
@@ -45,15 +54,6 @@ jobs:
               
               exit 1
             }
-                      
-      - name: Authenticate with Salesforce using JWT
-        run: |
-          sf auth jwt grant \
-            --client-id ${{ secrets.CONSUMER_KEY }} \
-            --jwt-key-file ${GITHUB_WORKSPACE}/assets/devopskeys/server.key \
-            --username ${{ env.USERNAME }} \
-            --instance-url https://login.salesforce.com \
-            --alias ${{ env.ORGNAME }}
 
       - name: Execute Apex Script and Capture JSON Output
         id: execute_apex
