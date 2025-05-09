@@ -36,13 +36,22 @@ jobs:
 
       - name: check environment exists
         run: |
-          # Verify environment exists
-          sf org display --target-org ${{ github.event.inputs.Environment }} --json > /dev/null 2>&1 || {
-            echo "::error::Environment '${{ github.event.inputs.Environment }}' does not exist or is not accessible."
-            echo "Run 'sf org list' to see available environments."
-            sf org list --all
-            exit 1
-          }
+            sf org display --target-org ${{ github.event.inputs.Environment }} --json > /dev/null 2>&1 || {
+              echo "::error::Environment '${{ github.event.inputs.Environment }}' does not exist or is not accessible."
+              
+              # Check if any orgs exist
+              ORG_COUNT=$(sf org list --json | jq '.result | length')
+              
+              if [ "$ORG_COUNT" -gt 0 ]; then
+                echo "Available environments:"
+                sf org list --json | jq -r '.result[] | "• " + (.alias // "No alias") + " (" + .orgId + ")"'
+              else
+                echo "No authenticated orgs found. Please authenticate with an org first:"
+                echo "$ sf org login web --alias your-org-alias"
+              fi
+              
+              exit 1
+            }
           
       - name: Authenticate with Salesforce using JWT
         run: |
