@@ -37,7 +37,7 @@ jobs:
       - name: Check if environment exists
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          INPUT_ENV_NAME: ${{ github.event.inputs.env_name }}
+          INPUT_ENV_NAME: ${{ github.event.inputs.Environment }}
         run: |
           echo "Checking if environment '$INPUT_ENV_NAME' exists..."
 
