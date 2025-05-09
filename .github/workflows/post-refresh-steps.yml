@@ -34,7 +34,16 @@ jobs:
       - name: Install sfdx-git-delta Plugin
         run: echo 'y' | sf plugins install sfdx-git-delta
 
-
+      - name: check environment exists
+        run: |
+          # Verify environment exists
+          sf org display --target-org ${{ github.event.inputs.Environment }} --json > /dev/null 2>&1 || {
+            echo "::error::Environment '${{ github.event.inputs.Environment }}' does not exist or is not accessible."
+            echo "Run 'sf org list' to see available environments."
+            sf org list --all
+            exit 1
+          }
+          
       - name: Authenticate with Salesforce using JWT
         run: |
           sf auth jwt grant \
@@ -56,14 +65,7 @@ jobs:
       - name: sf deploy metadata
         run: |
           echo "Deploying metadata to ${{ github.event.inputs.Environment }}..."
-          
-          # Verify environment exists
-          sf org display --target-org ${{ github.event.inputs.Environment }} --json > /dev/null 2>&1 || {
-            echo "::error::Environment '${{ github.event.inputs.Environment }}' does not exist or is not accessible."
-            echo "Run 'sf org list' to see available environments."
-            exit 1
-          }
-          
+                    
           # Deploy metadata
           sf project deploy start --source-dir ${GITHUB_WORKSPACE}/SandboxRefreshEnvironments/production-sfp/force-app/main/default/customMetadata --target-org ${{ github.event.inputs.Environment }} --ignore-conflicts --json | tee deploy_result.json
           
