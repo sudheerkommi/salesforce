@@ -34,9 +34,6 @@ jobs:
       - name: Install sfdx-git-delta Plugin
         run: echo 'y' | sf plugins install sfdx-git-delta
 
-      - name: Write private key to server.key
-        run: |
-          echo "$SERVER_KEY" > ${GITHUB_WORKSPACE}/assets/devopskeys/server.key  # Write the key to the file
 
       - name: Authenticate with Salesforce using JWT
         run: |
