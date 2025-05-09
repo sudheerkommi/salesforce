@@ -1,4 +1,4 @@
-name: SF Environment Setup
+name: SF Environment Setup & Deployment
 
 on:
   workflow_dispatch:
