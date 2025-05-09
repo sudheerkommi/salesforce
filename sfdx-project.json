@@ -1,0 +1,12 @@
+{
+  "packageDirectories": [
+    {
+      "path": "force-app",
+      "default": true
+    }
+  ],
+  "name": "PostRefreshAT&amp;T",
+  "namespace": "",
+  "sfdcLoginUrl": "https://data-energy-8691.scratch.my.salesforce.com",
+  "sourceApiVersion": "63.0"
+}
