@@ -66,10 +66,7 @@ jobs:
         id: execute_apex
         run: |
           echo "Running Apex script on org: ${{ env.ORGNAME }}"
-          result=$(sf apex run --file ${GITHUB_WORKSPACE}/scripts/test1.apex --target-org ${{ env.ORGNAME }} --json)
-          echo "$result" > apex_output.json
-          echo "Raw JSON Response:"
-          cat apex_output.json
+          sf apex run --file ${GITHUB_WORKSPACE}/scripts/test1.apex --target-org ${{ env.ORGNAME }} --json
 
       - name: sf deploy metadata
         run: |
