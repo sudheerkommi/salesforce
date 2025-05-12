@@ -1,4 +1,4 @@
+String cronExp = '0 0 9 * * ?'; // Every day at 9:00 AM
+String jobName = 'HelloWorldDailyJob';
+System.schedule(jobName, cronExp, new HelloWorld());
 
-System.debug('✅ Hello from GitHub Actions Apex execution!');
-Date today = Date.today();
-System.debug('📅 Today is: ' + today);
