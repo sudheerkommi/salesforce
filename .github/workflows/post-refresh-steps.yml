@@ -71,7 +71,7 @@ jobs:
           set -x
 
           # Run the Apex script and capture the JSON output
-          OUTPUT=$(sf apex run --file ${GITHUB_WORKSPACE}/scripts/test1.apex --target-org ${{ env.ORGNAME }} --json --ignore-conflicts)
+          OUTPUT=$(sf apex run --file ${GITHUB_WORKSPACE}/scripts/test1.apex --target-org ${{ env.ORGNAME }} --json )
 
           # Log the raw output for debugging purposes
           echo "Raw Apex run output: $OUTPUT"
