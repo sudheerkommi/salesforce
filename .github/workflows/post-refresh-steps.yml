@@ -57,7 +57,7 @@ jobs:
             --client-id ${{ secrets.CONSUMER_KEY }} \
             --jwt-key-file ${GITHUB_WORKSPACE}/assets/devopskeys/server.key \
             --username ${{ env.USERNAME }} \
-            --instance-url https://login.salesforce.com \
+            --instance-url https://test.salesforce.com \
             --alias ${{ env.ORGNAME }}
 
 
