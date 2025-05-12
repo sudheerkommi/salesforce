@@ -11,48 +11,24 @@ on:
 jobs:
   sf-env-setup:
     runs-on: ubuntu-latest
-    environment: ${{ github.event.inputs.Environment }}  # This sets the environment based on input
+    environment: ${{ github.event.inputs.Environment }}
 
     env:
       ORGNAME: ${{ github.event.inputs.Environment }}
-      USERNAME: ${{ vars.USERNAME }}
+      USERNAME: ${{ secrets.SF_USERNAME }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-
-      - name: Install Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: "20.0.0"
 
       - name: Install Salesforce CLI
         run: |
           npm install -g @salesforce/cli@2.49.7
           sf --version
 
-      - name: Install sfdx-git-delta Plugin
-        run: echo 'y' | sf plugins install sfdx-git-delta
-        
-      - name: Check if environment exists
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          INPUT_ENV_NAME: ${{ github.event.inputs.Environment }}
-        run: |
-          echo "Checking if environment '$INPUT_ENV_NAME' exists..."
-
-          ENV_LIST=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
-            https://api.github.com/repos/${{ github.repository }}/environments)
-
-          if echo "$ENV_LIST" | jq -r '.environments[].name' | grep -qx "$INPUT_ENV_NAME"; then
-            echo "✅ Environment '$INPUT_ENV_NAME' exists in the repository."
-          else
-            echo "❌ Environment '$INPUT_ENV_NAME' does NOT exist."
-            exit 1  # Fail the job if not found
-          fi
-                      
       - name: Authenticate with Salesforce using JWT
         run: |
+          echo "$JWT_PRIVATE_KEY" > ${GITHUB_WORKSPACE}/assets/devopskeys/server.key
           sf auth jwt grant \
             --client-id ${{ secrets.CONSUMER_KEY }} \
             --jwt-key-file ${GITHUB_WORKSPACE}/assets/devopskeys/server.key \
@@ -60,27 +36,42 @@ jobs:
             --instance-url https://test.salesforce.com \
             --alias ${{ env.ORGNAME }}
 
-
-
-      - name: Execute Apex Script and Capture JSON Output
-        id: execute_apex
+      - name: Run Apex script and handle exceptions
+        id: run_apex
         run: |
           echo "Running Apex script on org: ${{ env.ORGNAME }}"
-          sf apex run --file ${GITHUB_WORKSPACE}/scripts/test1.apex --target-org ${{ env.ORGNAME }} --json
 
-      - name: sf deploy metadata
+          # Run the Apex script and capture the JSON output
+          OUTPUT=$(sf apex run --file ${GITHUB_WORKSPACE}/scripts/test1.apex --target-org ${{ env.ORGNAME }} --json)
+          
+          # Log the full output for debugging purposes
+          echo "Apex run output: $OUTPUT"
+          
+          # Parse the JSON output to check for errors
+          ERROR_MESSAGE=$(echo "$OUTPUT" | jq -r '.result[].errorMessage // empty')
+          STATUS=$(echo "$OUTPUT" | jq -r '.status')
+
+          # Check if the error message contains the "job already scheduled" message
+          if [[ "$ERROR_MESSAGE" == *"The Apex job named"*"is already scheduled for execution."* ]]; then
+            echo "✅ Apex job is already scheduled. Skipping execution."
+            # Optionally, you can set an environment variable or take another action here
+          elif [ "$STATUS" == "Failed" ] || [ -n "$ERROR_MESSAGE" ]; then
+            echo "::error::Apex job failed. Error message: $ERROR_MESSAGE"
+            # Exit with failure if there's any other error
+            exit 1
+          else
+            echo "✅ Apex job executed successfully."
+          fi
+
+      - name: Deploy metadata to Salesforce
         run: |
-          echo "Deploying metadata to ${{ github.event.inputs.Environment }}..."
-                    
-          # Deploy metadata
+          echo "Deploying metadata..."
           sf project deploy start --source-dir ${GITHUB_WORKSPACE}/SandboxRefreshEnvironments/${{ github.event.inputs.Environment }}/force-app/main/default/customMetadata --target-org ${{ github.event.inputs.Environment }} --ignore-conflicts --json | tee deploy_result.json
           
-          # Check for component failures even if command succeeded
+          # Check for component failures
           if [ $(jq -r '.status // "Failed"' deploy_result.json) == "Failed" ]; then
-            echo "::warning::Deployment had component failures:"
+            echo "::warning:: Deployment had component failures:"
             jq -r '.result.details.componentFailures[] | .problem' deploy_result.json 2>/dev/null || echo "Could not parse component failures."
           else
             echo "✅ Metadata deployment completed successfully"
           fi
-          
-          
