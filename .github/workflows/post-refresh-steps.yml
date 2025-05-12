@@ -65,21 +65,12 @@ jobs:
         id: run_apex
         run: |
           echo "Running Apex script on org: ${{ env.ORGNAME }}"
-          # Enable debugging to print all commands
-          set -x
+          
           # Run the Apex script and capture the JSON output
           OUTPUT=$(sf apex run --file ${GITHUB_WORKSPACE}/scripts/test1.apex --target-org ${{ env.ORGNAME }} --json || echo "$?")
           # Log the raw output for debugging purposes
           echo "Raw Apex run output: $OUTPUT"
-          # Disable debugging to stop printing every command
-          set +x
-          
-          # Check if the output contains the "already scheduled" error message directly
-          if echo "$OUTPUT" | grep -q "already scheduled for execution"; then
-            echo "✅ Apex job is already scheduled. Skipping execution."
-            exit 0
-          fi
-          
+                   
           # Try to parse the error message from the exceptionMessage field
           EXCEPTION_MESSAGE=$(echo "$OUTPUT" | jq -r '.data.exceptionMessage // empty')
           
