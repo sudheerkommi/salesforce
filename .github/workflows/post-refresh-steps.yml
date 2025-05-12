@@ -62,17 +62,23 @@ jobs:
 
 
 
-      - name: Run Apex script and handle exceptions
+      - name: Run Apex script and capture output
         id: run_apex
         run: |
           echo "Running Apex script on org: ${{ env.ORGNAME }}"
 
+          # Enable debugging to print all commands
+          set -x
+
           # Run the Apex script and capture the JSON output
-          OUTPUT=$(sf apex run --file ${GITHUB_WORKSPACE}/scripts/test1.apex --target-org ${{ env.ORGNAME }} --json)
-          
-          # Log the full output for debugging purposes
-          echo "Apex run output: $OUTPUT"
-          
+          OUTPUT=$(sf apex run --file ${GITHUB_WORKSPACE}/scripts/test1.apex --target-org ${{ env.ORGNAME }} --json --verbose)
+
+          # Log the raw output for debugging purposes
+          echo "Raw Apex run output: $OUTPUT"
+
+          # Disable debugging to stop printing every command
+          set +x
+
           # Parse the JSON output to check for errors
           ERROR_MESSAGE=$(echo "$OUTPUT" | jq -r '.result[].errorMessage // empty')
           STATUS=$(echo "$OUTPUT" | jq -r '.status')
@@ -80,7 +86,6 @@ jobs:
           # Check if the error message contains the "job already scheduled" message
           if [[ "$ERROR_MESSAGE" == *"The Apex job named"*"is already scheduled for execution."* ]]; then
             echo "✅ Apex job is already scheduled. Skipping execution."
-            # Optionally, you can set an environment variable or take another action here
           elif [ "$STATUS" == "Failed" ] || [ -n "$ERROR_MESSAGE" ]; then
             echo "::error::Apex job failed. Error message: $ERROR_MESSAGE"
             # Exit with failure if there's any other error
