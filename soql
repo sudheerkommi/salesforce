@@ -1,0 +1,11 @@
+SELECT Id, Name,
+    (SELECT MemberType__c, MemberName__c
+     FROM MetadataDeployments__r
+     WHERE MemberType__c IN (
+         'ApexClass',
+         'ApexTrigger',
+         'AuraDefinitionBundle',
+         'LightningComponentBundle'
+     ))
+FROM User_Story__c
+WHERE Release__c = 'a0123456789XYZ'
