@@ -1,0 +1,15 @@
+name: Notify Teams
+
+on:
+  workflow_dispatch:  # Manual trigger; you can change to push or pull_request
+
+jobs:
+  send-teams-message:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Send POST to Power Automate
+        run: |
+          curl -X POST "${{ secrets.TEAMS_FLOW_WEBHOOK_URL }}" \
+          -H "Content-Type: application/json" \
+          -d '{"message": "🚀 Deployment completed from GitHub Actions!"}'
