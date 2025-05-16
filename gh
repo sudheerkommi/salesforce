@@ -8,3 +8,6 @@ steps:
       - name: Get PR creation date
         run: |
           gh pr view 16978 --json createdAt -q .createdAt | xargs -I{} date -d "{}" +"%Y-%m-%d %H:%M:%S CST"
+
+
+git show -s --format=%cI <commit-sha> | xargs -I{} TZ="America/Chicago" date -d "{}" +"%Y-%m-%d %H:%M:%S %Z"
