@@ -7,4 +7,4 @@ steps:
 
       - name: Get PR creation date
         run: |
-          gh pr view ${{ github.event.pull_request.number }} --json createdAt -q .createdAt
+          gh pr view 16978 --json createdAt -q .createdAt | xargs -I{} date -d "{}" +"%Y-%m-%d %H:%M:%S CST"
