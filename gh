@@ -1,0 +1,10 @@
+steps:
+      - name: Set up GitHub CLI
+        uses: cli/cli-action@v2
+
+      - name: Authenticate GitHub CLI
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+
+      - name: Get PR creation date
+        run: |
+          gh pr view ${{ github.event.pull_request.number }} --json createdAt -q .createdAt
