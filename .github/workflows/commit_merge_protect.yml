@@ -1,0 +1,32 @@
+name: Block Merge Commits from Main
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  prevent-merge-commits:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Required to access full history
+
+      - name: Fetch base branch
+        run: git fetch origin ${{ github.base_ref }}
+
+      - name: Detect merge commits in PR
+        run: |
+          echo "Checking for merge commits from main into feature branch..."
+          MERGE_COMMITS=$(git log origin/${{ github.base_ref }}..HEAD --merges --pretty=format:"%h - %s")
+          
+          if [[ -n "$MERGE_COMMITS" ]]; then
+            echo "❌ Merge commits detected:"
+            echo "$MERGE_COMMITS"
+            echo "❌ Please rebase or squash instead of merging main into feature branch."
+            exit 1
+          else
+            echo "✅ No merge commits found. Good to go!"
+          fi
