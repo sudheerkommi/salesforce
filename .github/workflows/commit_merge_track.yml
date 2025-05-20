@@ -1,15 +1,15 @@
-name: Prevent Merges from Base Branch into PR Branch
+name: Prevent Direct Merge Commit from Main
 
 on:
   pull_request:
     types: [opened, synchronize, reopened]
 
 jobs:
-  prevent-base-merge:
+  detect-direct-main-merge:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout full history
+      - name: Checkout full repo
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -17,23 +17,23 @@ jobs:
       - name: Fetch base branch
         run: git fetch origin ${{ github.base_ref }}
 
-      - name: Check for merge commits from ${{ github.base_ref }}
+      - name: Detect merge commit message like "Merge branch '${{ github.base_ref }}' into ${{ github.head_ref }}"
         run: |
-          echo "🔍 Checking for merge commits from '${{ github.base_ref }}' into '${{ github.head_ref }}'..."
+          echo "🔍 Checking for specific merge message from '${{ github.base_ref }}' into '${{ github.head_ref }}'..."
 
-          base_sha=$(git rev-parse origin/${{ github.base_ref }})
-          echo "🧬 Base branch (${{
-            github.base_ref }}) SHA: $base_sha"
+          pattern="Merge branch '${{ github.base_ref }}' into ${{ github.head_ref }}"
 
-          merge_commits=$(git log origin/${{ github.base_ref }}..HEAD --merges --pretty=format:"%H")
+          # Get all merge commits introduced in this PR range
+          merge_msgs=$(git log origin/${{ github.base_ref }}..HEAD --merges --pretty=format:"%s")
 
-          for commit in $merge_commits; do
-            parents=$(git show --quiet --pretty=format:"%P" $commit)
-            if echo "$parents" | grep -q "$base_sha"; then
-              echo "❌ Merge commit from '${{ github.base_ref }}' detected: $commit"
-              echo "⚠️ Please use 'git rebase origin/${{ github.base_ref }}' instead of merging it into '${{ github.head_ref }}'."
-              exit 1
-            fi
-          done
+          echo "🔍 Found merge messages:"
+          echo "$merge_msgs"
 
-          echo "✅ No merge commits from '${{ github.base_ref }}' found."
+          # Look for specific merge message
+          if echo "$merge_msgs" | grep -q "$pattern"; then
+            echo "❌ Merge commit matching '$pattern' detected."
+            echo "⚠️ Please use 'git rebase origin/${{ github.base_ref }}' instead of merging '${{ github.base_ref }}' into '${{ github.head_ref }}'."
+            exit 1
+          fi
+
+          echo "✅ No direct 'Merge branch' commit from '${{ github.base_ref }}' found."
