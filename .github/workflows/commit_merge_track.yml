@@ -1,0 +1,39 @@
+name: Prevent Merges from Base Branch into PR Branch
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  prevent-base-merge:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch base branch
+        run: git fetch origin ${{ github.base_ref }}
+
+      - name: Check for merge commits from ${{ github.base_ref }}
+        run: |
+          echo "🔍 Checking for merge commits from '${{ github.base_ref }}' into '${{ github.head_ref }}'..."
+
+          base_sha=$(git rev-parse origin/${{ github.base_ref }})
+          echo "🧬 Base branch (${{
+            github.base_ref }}) SHA: $base_sha"
+
+          merge_commits=$(git log origin/${{ github.base_ref }}..HEAD --merges --pretty=format:"%H")
+
+          for commit in $merge_commits; do
+            parents=$(git show --quiet --pretty=format:"%P" $commit)
+            if echo "$parents" | grep -q "$base_sha"; then
+              echo "❌ Merge commit from '${{ github.base_ref }}' detected: $commit"
+              echo "⚠️ Please use 'git rebase origin/${{ github.base_ref }}' instead of merging it into '${{ github.head_ref }}'."
+              exit 1
+            fi
+          done
+
+          echo "✅ No merge commits from '${{ github.base_ref }}' found."
