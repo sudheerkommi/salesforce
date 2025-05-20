@@ -1,39 +1,37 @@
-name: Prevent Direct Merge Commit from Main
+name: Detect "Commit merge" Conflict Resolution from Main
 
 on:
   pull_request:
     types: [opened, synchronize, reopened]
 
 jobs:
-  detect-direct-main-merge:
+  detect-conflict-merge-message:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout full repo
+      - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0  # Required to get full commit history
 
       - name: Fetch base branch
         run: git fetch origin ${{ github.base_ref }}
 
-      - name: Detect merge commit message like "Merge branch '${{ github.base_ref }}' into ${{ github.head_ref }}"
+      - name: Detect conflict-resolution merge commit from base branch
         run: |
-          echo "🔍 Checking for specific merge message from '${{ github.base_ref }}' into '${{ github.head_ref }}'..."
+          echo "🔍 Checking for conflict-resolution merge commits..."
+          
+          expected="Merge branch '${{ github.base_ref }}' into ${{ github.head_ref }}"
+          echo "🔎 Expected merge message (if conflict was resolved with GitHub UI):"
+          echo "$expected"
 
-          pattern="Merge branch '${{ github.base_ref }}' into ${{ github.head_ref }}"
-
-          # Get all merge commits introduced in this PR range
           merge_msgs=$(git log origin/${{ github.base_ref }}..HEAD --merges --pretty=format:"%s")
 
-          echo "🔍 Found merge messages:"
-          echo "$merge_msgs"
-
-          # Look for specific merge message
-          if echo "$merge_msgs" | grep -q "$pattern"; then
-            echo "❌ Merge commit matching '$pattern' detected."
-            echo "⚠️ Please use 'git rebase origin/${{ github.base_ref }}' instead of merging '${{ github.base_ref }}' into '${{ github.head_ref }}'."
+          if echo "$merge_msgs" | grep -Fx "$expected"; then
+            echo "⚠️ Detected GitHub 'Commit merge' conflict resolution commit:"
+            echo "$expected"
+            echo "❗ Please resolve conflicts locally using 'git rebase origin/${{ github.base_ref }}'"
             exit 1
           fi
 
-          echo "✅ No direct 'Merge branch' commit from '${{ github.base_ref }}' found."
+          echo "✅ No conflict-resolution merge commits found. All good."
