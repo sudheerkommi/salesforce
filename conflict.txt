@@ -1,1 +1,1 @@
-This is the conflicting change in main
+Resolved content combining both changes
