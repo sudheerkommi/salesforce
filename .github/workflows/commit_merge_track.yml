@@ -5,29 +5,33 @@ on:
     types: [opened, synchronize, reopened]
 
 jobs:
-  detect-merge-msg:
+  detect-conflict-merge-message:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Required to get full commit history
 
-      - name: Install GitHub CLI
-        run: sudo apt-get install gh
+      - name: Fetch base branch
+        run: git fetch origin ${{ github.base_ref }}
 
-      - name: Check PR commit messages for 'Commit merge'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Detect conflict-resolution merge commit from base branch
         run: |
-          pr_number=${{ github.event.pull_request.number }}
-          echo "🔍 Checking commits for PR #$pr_number"
-
-          gh pr view "$pr_number" --json commits --jq '.commits[].commit.message' > messages.txt
-
+          echo "🔍 Checking for conflict-resolution merge commits..."
+          
           expected="Merge branch '${{ github.base_ref }}' into ${{ github.head_ref }}"
+          echo "🔎 Expected merge message (if conflict was resolved with GitHub UI):"
+          echo "$expected"
 
-          if grep -Fx "$expected" messages.txt; then
-            echo "❌ Detected GitHub conflict-resolution merge: $expected"
+          merge_msgs=$(git log origin/${{ github.base_ref }}..HEAD --merges --pretty=format:"%s")
+
+          if echo "$merge_msgs" | grep -Fx "$expected"; then
+            echo "⚠️ Detected GitHub 'Commit merge' conflict resolution commit:"
+            echo "$expected"
+            echo "❗ Please resolve conflicts locally using 'git rebase origin/${{ github.base_ref }}'"
             exit 1
-          else
-            echo "✅ No merge-style commit from main found."
           fi
 
+          echo "✅ No conflict-resolution merge commits found. All good."
