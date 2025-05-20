@@ -16,22 +16,59 @@ jobs:
 
       - name: Fetch base branch
         run: git fetch origin ${{ github.base_ref }}
-
-      - name: Detect conflict-resolution merge commit from base branch
+      - name: Detect conflict-resolution merges and validate commit types
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "🔍 Checking for conflict-resolution merge commits..."
+          echo "🔍 Fetching commit messages from PR via GitHub CLI..."
           
-          expected="Merge branch '${{ github.base_ref }}' into ${{ github.head_ref }}"
-          echo "🔎 Expected merge message (if conflict was resolved with GitHub UI):"
-          echo "$expected"
-
-          merge_msgs=$(git log origin/${{ github.base_ref }}..HEAD --merges --pretty=format:"%s")
-
-          if echo "$merge_msgs" | grep -Fx "$expected"; then
-            echo "⚠️ Detected GitHub 'Commit merge' conflict resolution commit:"
-            echo "$expected"
-            echo "❗ Please resolve conflicts locally using 'git rebase origin/${{ github.base_ref }}'"
+          pr_number=${{ github.event.pull_request.number }}
+          base_branch=${{ github.base_ref }}
+          head_branch=${{ github.head_ref }}
+          expected_merge_msg="Merge branch '$base_branch' into $head_branch"
+      
+          # Get all commit messages
+          messages=$(gh pr view "$pr_number" --json commits --jq '.commits[].commit.message')
+      
+          echo "🔎 Commit messages in PR:"
+          echo "$messages"
+      
+          # ✅ Detect GitHub conflict-style commit
+          if echo "$messages" | grep -Fx "$expected_merge_msg"; then
+            echo "❌ Conflict-resolution merge detected:"
+            echo "$expected_merge_msg"
+            echo "❗ Please resolve conflicts locally using: git rebase origin/$base_branch"
             exit 1
           fi
+      
+          # ✅ Validate commit types (Conventional Commits)
+          echo "$messages" | grep -vE '^feat:|^fix:|^docs:|^chore:|^refactor:|^style:|^test:' > invalid.txt || true
+      
+          if [ -s invalid.txt ]; then
+            echo "❌ The following commits don't follow Conventional Commit format:"
+            cat invalid.txt
+            echo "❗ Use types like: feat:, fix:, docs:, chore:, etc."
+            exit 1
+          fi
+      
+          echo "✅ All commit messages are valid and no GitHub conflict-resolution merge found."
 
-          echo "✅ No conflict-resolution merge commits found. All good."
+
+      # - name: Detect conflict-resolution merge commit from base branch
+      #   run: |
+      #     echo "🔍 Checking for conflict-resolution merge commits..."
+          
+      #     expected="Merge branch '${{ github.base_ref }}' into ${{ github.head_ref }}"
+      #     echo "🔎 Expected merge message (if conflict was resolved with GitHub UI):"
+      #     echo "$expected"
+
+      #     merge_msgs=$(git log origin/${{ github.base_ref }}..HEAD --merges --pretty=format:"%s")
+
+      #     if echo "$merge_msgs" | grep -Fx "$expected"; then
+      #       echo "⚠️ Detected GitHub 'Commit merge' conflict resolution commit:"
+      #       echo "$expected"
+      #       echo "❗ Please resolve conflicts locally using 'git rebase origin/${{ github.base_ref }}'"
+      #       exit 1
+      #     fi
+
+      #     echo "✅ No conflict-resolution merge commits found. All good."
