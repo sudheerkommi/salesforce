@@ -32,6 +32,11 @@ jobs:
             echo "$expected"
             echo "❗ Please resolve conflicts locally using 'git rebase origin/${{ github.base_ref }}'"
             exit 1
+          elif echo "$merge_msgs" | grep -i "merge"; then
+            echo "⚠️ Detected a merge commit containing 'merge' in the message."
+            echo "❗ Avoid merging base branch manually. Use rebase instead."
+            exit 1
+          fi
           fi
 
           echo "✅ No conflict-resolution merge commits found. All good."
