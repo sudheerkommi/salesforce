@@ -1,0 +1,27 @@
+#!/bin/bash
+
+# Use the standard Git commit message file
+commit_msg_file=".git/COMMIT_EDITMSG"
+
+# Read first line of actual commit message
+commit_msg=$(head -n 1 "$commit_msg_file")
+lower_msg=$(echo "$commit_msg" | tr '[:upper:]' '[:lower:]')
+
+echo "🔍 Checking commit message: $commit_msg"
+
+# Block GitHub-style merge commits
+if echo "$commit_msg" | grep -qE "^Merge branch '.*' into .*"; then
+  echo "❌ GitHub-style merge commit detected."
+  echo "🔒 Please resolve conflicts using 'git rebase' instead of merge."
+  exit 1
+fi
+
+# Block anything with "merge" in the message
+if echo "$lower_msg" | grep -q "\bmerge\b"; then
+  echo "❌ Commit message contains the word 'merge'."
+  echo "🔒 Merge commits are not allowed."
+  exit 1
+fi
+
+echo "✅ Commit message is clean."
+exit 0
