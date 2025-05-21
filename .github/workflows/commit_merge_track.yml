@@ -20,53 +20,20 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "🔍 Fetching commit messages from PR via GitHub CLI..."
-
-          pr_number=${{ github.event.pull_request.number }}
-          base_branch=${{ github.event.pull_request.base.ref }}
-          head_branch=${{ github.event.pull_request.head.ref }}
-          expected_merge_msg="Merge branch '$base_branch' into $head_branch"
-
-          # Get all commit messages in the PR
+      
+          # Get all commit messages
           messages=$(gh pr view "$pr_number" --json commits --jq '.commits[].commit.message')
-
+      
           echo "🔎 Commit messages in PR:"
           echo "$messages"
-
-          # Check for exact merge commit
-          if echo "$messages" | grep -Fx "$expected_merge_msg"; then
+      
+          # ✅ Detect GitHub conflict-style commit
+          if echo "$messages" | grep -Fx "$expected_merge_msg" || echo "$messages" | grep -iq "merge"; then
             echo "❌ Conflict-resolution merge detected:"
             echo "$expected_merge_msg"
             echo "❗ Please resolve conflicts locally using: git rebase origin/$base_branch"
             exit 1
           fi
-
-          # Check for any commit message containing 'merge' (case-insensitive)
-          if echo "$messages" | grep -i "merge"; then
-            echo "❌ A commit contains the word 'merge' (not allowed in PRs):"
-            echo "❗ Use rebase instead of merge."
-            exit 1
-          fi
-          # echo "🔍 Fetching commit messages from PR via GitHub CLI..."
-          
-          # pr_number=${{ github.event.pull_request.number }}
-          # base_branch=${{ github.base_ref }}
-          # head_branch=${{ github.head_ref }}
-          # expected_merge_msg="Merge branch '$base_branch' into $head_branch"
-      
-          # # Get all commit messages
-          # messages=$(gh pr view "$pr_number" --json commits --jq '.commits[].commit.message')
-      
-          # echo "🔎 Commit messages in PR:"
-          # echo "$messages"
-      
-          # # ✅ Detect GitHub conflict-style commit
-          # if echo "$messages" | grep -Fx "$expected_merge_msg"; then
-          #   echo "❌ Conflict-resolution merge detected:"
-          #   echo "$expected_merge_msg"
-          #   echo "❗ Please resolve conflicts locally using: git rebase origin/$base_branch"
-          #   exit 1
-          # fi
       
           # # ✅ Validate commit types (Conventional Commits)
           # echo "$messages" | grep -vE '^feat:|^fix:|^docs:|^chore:|^refactor:|^style:|^test:' > invalid.txt || true
