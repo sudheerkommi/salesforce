@@ -1,0 +1,125 @@
+name: Detect Merge/Rebase from Base Branch and Notify Teams
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  detect-conflict-merge-message:
+    runs-on: ubuntu-latest
+    outputs:
+      includes_base: ${{ steps.detect.outputs.includes_base }}
+      merge_list: ${{ steps.detect.outputs.merge_list }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch base branch
+        run: git fetch origin ${{ github.base_ref }}
+
+      - name: Detect merges/rebases from base branch
+        id: detect
+        run: |
+          set -e
+          BASE_BRANCH="${{ github.base_ref }}"
+          FEATURE_BRANCH="${{ github.head_ref }}"
+          MAIN_BRANCH="main"
+
+          echo "🔍 Detecting merges/rebases from $BASE_BRANCH into $FEATURE_BRANCH after diverging from $MAIN_BRANCH..."
+
+          # Detect merge commits from base branch in feature branch after diverging from main
+          merge_commits=$(git log $MAIN_BRANCH..HEAD --merges --pretty=format:"%H" --grep="Merge branch '$BASE_BRANCH'" || true)
+
+          if [ -n "$merge_commits" ]; then
+            echo "Includes merge commits from $BASE_BRANCH"
+            echo "::set-output name=includes_base::true"
+            echo "::set-output name=merge_list::$(echo $merge_commits | tr ' ' ',')"
+          else
+            echo "No merge commits detected from $BASE_BRANCH"
+            echo "::set-output name=includes_base::false"
+            echo "::set-output name=merge_list::"
+          fi
+
+      - name: Post PR comment on detection
+        if: steps.detect.outputs.includes_base == 'true'
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          echo "Posting PR comment..."
+
+          gh api -X POST /repos/$REPO/issues/$PR_NUMBER/comments \
+            -f body="⚠️ Critical Alert: Merge/Rebase from ${{ github.base_ref }} detected in the feature branch. Please review."
+
+      - name: Send detailed Teams notification on detection
+        if: steps.detect.outputs.includes_base == 'true'
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          REPO: ${{ github.repository }}
+          TEAMS_WEBHOOK_URL: ${{ secrets.TEAMS_WEBHOOK_URL }}
+          MERGE_LIST: ${{ steps.detect.outputs.merge_list }}
+          BASE_BRANCH_NAME: ${{ github.base_ref }}
+          FEATURE_BRANCH: ${{ github.head_ref }}
+        run: |
+          echo "Preparing Teams notification..."
+
+          IFS=',' read -r -a commits <<< "$MERGE_LIST"
+
+          MERGE_COMMIT_DETAILS=""
+          for commit in "${commits[@]}"; do
+            commit_info=$(git show -s --format="• %h by %an on %ad - %s" --date=short $commit)
+            MERGE_COMMIT_DETAILS="${MERGE_COMMIT_DETAILS}${commit_info}\n"
+          done
+
+          teams_message=$(jq -n \
+            --arg pr_number "$PR_NUMBER" \
+            --arg pr_title "$PR_TITLE" \
+            --arg pr_author "$PR_AUTHOR" \
+            --arg pr_url "$PR_URL" \
+            --arg base_branch "$BASE_BRANCH_NAME" \
+            --arg feature_branch "$FEATURE_BRANCH" \
+            --arg merge_commits "$MERGE_COMMIT_DETAILS" \
+            '{
+              type: "AdaptiveCard",
+              version: "1.4",
+              body: [
+                {
+                  type: "TextBlock",
+                  text: "⚠️ **Critical Alert: Merge/Rebase Detected from Base Branch**",
+                  weight: "Bolder",
+                  size: "Medium",
+                  color: "Attention"
+                },
+                {
+                  type: "FactSet",
+                  facts: [
+                    { title: "PR Number:", value: "[#"+$pr_number+"]("+$pr_url+")" },
+                    { title: "PR Title:", value: $pr_title },
+                    { title: "Author:", value: $pr_author },
+                    { title: "Base Branch:", value: $base_branch },
+                    { title: "Feature Branch:", value: $feature_branch }
+                  ]
+                },
+                {
+                  type: "TextBlock",
+                  text: "Merge Commits Detected:",
+                  weight: "Bolder",
+                  spacing: "Medium"
+                },
+                {
+                  type: "TextBlock",
+                  text: $merge_commits,
+                  wrap: true,
+                  spacing: "None"
+                }
+              ],
+              msteams: { width: "Full" }
+            }')
+
+          curl -H "Content-Type: application/json" -d "$teams_message" "$TEAMS_WEBHOOK_URL"
