@@ -4,6 +4,10 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
 
+permissions:
+  contents: read
+  pull-requests: write  # Required for commenting via gh CLI
+
 jobs:
   detect-conflict-merge-message:
     runs-on: ubuntu-latest
@@ -12,7 +16,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0  # Ensure full history for git log
 
       - name: Get branch info
         id: vars
@@ -26,35 +30,41 @@ jobs:
         id: detect
         run: |
           set -e
-      
+
           echo "🔍 Checking for merge commits from $BASE_BRANCH into $FEATURE_BRANCH since $BASE_COMMIT"
-      
-          MERGE_LIST=$(git log $BASE_COMMIT..origin/$FEATURE_BRANCH --merges --grep="$BASE_BRANCH" --pretty=format:"%h | %an | %ad | %s" || true)
-      
+
+          # Get merge commits with author/date/message
+          MERGE_LIST=$(git log $BASE_COMMIT..origin/$FEATURE_BRANCH \
+            --merges --grep="$BASE_BRANCH" \
+            --pretty=format:"%h | %an | %ad | %s" || true)
+
           git log origin/main..origin/$BASE_BRANCH --pretty=format:"%s" > devint_commits.txt
           git log $BASE_COMMIT..origin/$FEATURE_BRANCH --pretty=format:"%s" > feature_commits.txt
-      
+
           REBASED_LIST=$(grep -Ff devint_commits.txt feature_commits.txt || true)
-      
+
           if [[ -n "$MERGE_LIST" ]]; then
             echo "❌ Merge commit(s) from $BASE_BRANCH detected:"
             echo "$MERGE_LIST"
             echo "merge_list<<EOF" >> $GITHUB_OUTPUT
             echo "$MERGE_LIST" >> $GITHUB_OUTPUT
             echo "EOF" >> $GITHUB_OUTPUT
+            echo "includes_base=true" >> $GITHUB_OUTPUT
             exit 1
+          else
+            echo "✅ No merge commits found from $BASE_BRANCH."
+            echo "includes_base=false" >> $GITHUB_OUTPUT
+            echo "merge_list=" >> $GITHUB_OUTPUT
           fi
-      
-          echo "✅ No merge commits found from $BASE_BRANCH."
-          echo "includes_base=false" >> $GITHUB_OUTPUT
 
-      - name: Post PR comment if needed
-        if: failure()
+      - name: Post PR comment if merge detected
+        if: steps.detect.outputs.includes_base == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           REPO: ${{ github.repository }}
+          MERGE_INFO: ${{ steps.detect.outputs.merge_list }}
         run: |
           echo "💬 Posting comment to PR about invalid merge..."
           gh api -X POST /repos/$REPO/issues/$PR_NUMBER/comments \
-            -f body="❌ **Error**: Merge commits from \`${{ github.base_ref }}\` were detected in this PR. Please remove them and rebase your branch from \`main\` instead."
+            -f body="❌ **Error**: Merge commits from \`${{ github.base_ref }}\` were detected in this PR. Please remove them and rebase your branch from \`main\` instead.\n\n**Detected Merge Commits:**\n\`\`\`\n$MERGE_INFO\n\`\`\`"
