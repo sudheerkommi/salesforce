@@ -7,9 +7,6 @@ on:
 jobs:
   detect-conflict-merge-message:
     runs-on: ubuntu-latest
-    outputs:
-      includes_base: ${{ steps.detect.outputs.includes_base }}
-      merge_list: ${{ steps.detect.outputs.merge_list }}
 
     steps:
       - name: Checkout code
@@ -24,27 +21,37 @@ jobs:
           echo "FEATURE_BRANCH=${{ github.head_ref }}" >> $GITHUB_ENV
           BASE_COMMIT=$(git merge-base origin/main origin/${{ github.head_ref }})
           echo "BASE_COMMIT=$BASE_COMMIT" >> $GITHUB_ENV
-          
-      - name: Detect merge commits from devint
-        run: |
-          echo "🔍 Checking for merge commits from devint into $FEATURE_BRANCH since $BASE_COMMIT"
-          git log $BASE_COMMIT..origin/$FEATURE_BRANCH --merges --oneline --grep="devint" || echo "✅ No merge commits from devint found."
 
-      - name: List commit subjects in devint and feature branch
+      - name: Detect merges and rebases from base branch
+        id: detect
         run: |
-          git log origin/main..origin/devint --pretty=format:"%s" > devint_commits.txt
+          set -e
+
+          echo "🔍 Checking for merge commits from $BASE_BRANCH into $FEATURE_BRANCH since $BASE_COMMIT"
+
+          MERGE_LIST=$(git log $BASE_COMMIT..origin/$FEATURE_BRANCH --merges --oneline --grep="$BASE_BRANCH" || true)
+
+          git log origin/main..origin/$BASE_BRANCH --pretty=format:"%s" > devint_commits.txt
           git log $BASE_COMMIT..origin/$FEATURE_BRANCH --pretty=format:"%s" > feature_commits.txt
-          echo "🔍 Checking if any commits from devint are present in feature branch via rebase/cherry-pick:"
-          grep -Ff devint_commits.txt feature_commits.txt || echo "✅ No rebased commits from devint found."
-          
-      - name: Post PR comment on detection
-        if: steps.detect.outputs.includes_base == 'true'
+
+          REBASED_LIST=$(grep -Ff devint_commits.txt feature_commits.txt || true)
+
+          if [[ -n "$MERGE_LIST" ]]; then
+            echo "❌ Merge commit(s) from $BASE_BRANCH detected:"
+            echo "$MERGE_LIST"
+            exit 1
+          fi
+
+          echo "✅ No merge commits found from $BASE_BRANCH."
+          echo "includes_base=false" >> $GITHUB_OUTPUT
+
+      - name: Post PR comment if needed
+        if: failure()
         env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           REPO: ${{ github.repository }}
         run: |
-          echo "Posting PR comment..."
+          echo "💬 Posting comment to PR about invalid merge..."
           gh api -X POST /repos/$REPO/issues/$PR_NUMBER/comments \
-            -f body="⚠️ **Critical Alert**: Merge/Rebase from \`${{ github.base_ref }}\` detected in this feature branch. Please review."
-
-
+            -f body="❌ **Error**: Merge commits from \`${{ github.base_ref }}\` were detected in this PR. Please remove them and rebase your branch from \`main\` instead."
