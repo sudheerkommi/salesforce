@@ -12,14 +12,19 @@ jobs:
       merge_list: ${{ steps.detect.outputs.merge_list }}
 
     steps:
+      # -- 1. Check out the PR code --------------------------
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Fetch base branch
-        run: git fetch origin ${{ github.base_ref }}
+      # -- 2. Make sure both the PR’s base branch *and* main exist locally
+      - name: Fetch base and main branches
+        run: |
+          # Pull the PR’s base branch (e.g. develop/release) and the main branch
+          git fetch origin ${{ github.base_ref }} main
 
+      # -- 3. Detect any merges/rebases from the base branch ------------------
       - name: Detect merges/rebases from base branch
         id: detect
         run: |
@@ -30,19 +35,21 @@ jobs:
 
           echo "🔍 Detecting merges/rebases from $BASE_BRANCH into $FEATURE_BRANCH after diverging from $MAIN_BRANCH..."
 
-          # Detect merge commits from base branch in feature branch after diverging from main
-          merge_commits=$(git log $MAIN_BRANCH..HEAD --merges --pretty=format:"%H" --grep="Merge branch '$BASE_BRANCH'" || true)
+          # Look for merge commits that pulled $BASE_BRANCH into the feature branch
+          merge_commits=$(git log $MAIN_BRANCH..HEAD --merges --pretty=format:"%H" \
+                           --grep="Merge branch '$BASE_BRANCH'" || true)
 
           if [ -n "$merge_commits" ]; then
             echo "Includes merge commits from $BASE_BRANCH"
-            echo "::set-output name=includes_base::true"
-            echo "::set-output name=merge_list::$(echo $merge_commits | tr ' ' ',')"
+            echo "includes_base=true"       >> "$GITHUB_OUTPUT"
+            echo "merge_list=$(echo $merge_commits | tr ' ' ',')" >> "$GITHUB_OUTPUT"
           else
             echo "No merge commits detected from $BASE_BRANCH"
-            echo "::set-output name=includes_base::false"
-            echo "::set-output name=merge_list::"
+            echo "includes_base=false"      >> "$GITHUB_OUTPUT"
+            echo "merge_list="              >> "$GITHUB_OUTPUT"
           fi
 
+      # -- 4. Comment on the PR if a merge/rebase was detected ----------------
       - name: Post PR comment on detection
         if: steps.detect.outputs.includes_base == 'true'
         env:
@@ -50,10 +57,10 @@ jobs:
           REPO: ${{ github.repository }}
         run: |
           echo "Posting PR comment..."
-
           gh api -X POST /repos/$REPO/issues/$PR_NUMBER/comments \
-            -f body="⚠️ Critical Alert: Merge/Rebase from ${{ github.base_ref }} detected in the feature branch. Please review."
+            -f body="⚠️ **Critical Alert**: Merge/Rebase from \`${{ github.base_ref }}\` detected in this feature branch. Please review."
 
+      # -- 5. Send a detailed Microsoft Teams notification --------------------
       - name: Send detailed Teams notification on detection
         if: steps.detect.outputs.includes_base == 'true'
         env:
@@ -69,14 +76,16 @@ jobs:
         run: |
           echo "Preparing Teams notification..."
 
+          # Split comma-separated commit SHAs into an array
           IFS=',' read -r -a commits <<< "$MERGE_LIST"
 
           MERGE_COMMIT_DETAILS=""
           for commit in "${commits[@]}"; do
-            commit_info=$(git show -s --format="• %h by %an on %ad - %s" --date=short $commit)
+            commit_info=$(git show -s --format="• %h by %an on %ad — %s" --date=short $commit)
             MERGE_COMMIT_DETAILS="${MERGE_COMMIT_DETAILS}${commit_info}\n"
           done
 
+          # Build an Adaptive Card payload
           teams_message=$(jq -n \
             --arg pr_number "$PR_NUMBER" \
             --arg pr_title "$PR_TITLE" \
@@ -100,10 +109,10 @@ jobs:
                   type: "FactSet",
                   facts: [
                     { title: "PR Number:", value: "[#"+$pr_number+"]("+$pr_url+")" },
-                    { title: "PR Title:", value: $pr_title },
-                    { title: "Author:", value: $pr_author },
-                    { title: "Base Branch:", value: $base_branch },
-                    { title: "Feature Branch:", value: $feature_branch }
+                    { title: "Title:",      value: $pr_title },
+                    { title: "Author:",     value: $pr_author },
+                    { title: "Base:",       value: $base_branch },
+                    { title: "Feature:",    value: $feature_branch }
                   ]
                 },
                 {
@@ -122,4 +131,5 @@ jobs:
               msteams: { width: "Full" }
             }')
 
+          # Send the card to Teams
           curl -H "Content-Type: application/json" -d "$teams_message" "$TEAMS_WEBHOOK_URL"
