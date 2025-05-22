@@ -22,7 +22,8 @@ jobs:
       - name: Fetch base and main branches
         run: |
           # Pull the PR’s base branch (e.g. develop/release) and the main branch
-          git fetch origin ${{ github.base_ref }} main
+          git fetch origin ${{ github.base_ref }} 
+          git fetch origin main
 
       # -- 3. Detect any merges/rebases from the base branch ------------------
       - name: Detect merges/rebases from base branch
