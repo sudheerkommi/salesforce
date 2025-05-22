@@ -1,4 +1,4 @@
-name: Detect Merge/Rebase from Base Branch and Notify Teams
+name: Detect Merge/Rebase from Base Branch and Notify Team
 
 on:
   pull_request:
