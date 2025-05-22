@@ -26,34 +26,40 @@ jobs:
           BASE_COMMIT=$(git merge-base origin/main origin/${{ github.head_ref }})
           echo "BASE_COMMIT=$BASE_COMMIT" >> $GITHUB_ENV
 
-      - name: Detect merges and rebases from base branch
+      - name: Detect merge commits from ${{ github.base_ref }} into feature
         id: detect
         run: |
-          set -e
+          echo "🔍 Checking for merges from $BASE_BRANCH into $FEATURE_BRANCH since $BASE_COMMIT..."
 
-          echo "🔍 Checking for merge commits from $BASE_BRANCH into $FEATURE_BRANCH since $BASE_COMMIT"
+          MERGE_COMMITS=()
 
-          # Get merge commits with author/date/message
-          MERGE_LIST=$(git log $BASE_COMMIT..origin/$FEATURE_BRANCH --first-parent --merges --pretty=format:"%h | %an | %ad | %s" || true)
+          for sha in $(git rev-list --merges $BASE_COMMIT..origin/$FEATURE_BRANCH); do
+            second_parent=$(git rev-parse "$sha^2")
 
+            if git merge-base --is-ancestor "$second_parent" origin/$BASE_BRANCH; then
+              MERGE_COMMITS+=("$sha")
+            fi
+          done
 
-          git log origin/main..origin/$BASE_BRANCH --pretty=format:"%s" > devint_commits.txt
-          git log $BASE_COMMIT..origin/$FEATURE_BRANCH --pretty=format:"%s" > feature_commits.txt
-
-          REBASED_LIST=$(grep -Ff devint_commits.txt feature_commits.txt || true)
-
-          if [[ -n "$MERGE_LIST" ]]; then
+          if [ ${#MERGE_COMMITS[@]} -gt 0 ]; then
             echo "❌ Merge commit(s) from $BASE_BRANCH detected:"
-            echo "$MERGE_LIST"
-            echo "merge_list<<EOF" >> $GITHUB_OUTPUT
-            echo "$MERGE_LIST" >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
+            for sha in "${MERGE_COMMITS[@]}"; do
+              git show -s --format="• %h | %an | %ad | %s" --date=short $sha
+            done
+
+            {
+              echo "merge_list<<EOF"
+              for sha in "${MERGE_COMMITS[@]}"; do
+                git show -s --format="• %h | %an | %ad | %s" --date=short $sha
+              done
+              echo "EOF"
+            } >> $GITHUB_OUTPUT
+
             echo "includes_base=true" >> $GITHUB_OUTPUT
             exit 1
           else
-            echo "✅ No merge commits found from $BASE_BRANCH."
+            echo "✅ No merge commits from $BASE_BRANCH found."
             echo "includes_base=false" >> $GITHUB_OUTPUT
-            echo "merge_list=" >> $GITHUB_OUTPUT
           fi
 
       - name: Post PR comment if merge detected
