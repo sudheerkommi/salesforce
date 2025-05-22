@@ -4,6 +4,10 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
 
+permissions:
+  contents: read
+  pull-requests: write  # Required for commenting via gh CLI
+
 jobs:
   detect-conflict-merge-message:
     runs-on: ubuntu-latest
@@ -12,7 +16,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0  # Ensure full history for git log
 
       - name: Get branch info
         id: vars
@@ -22,36 +26,72 @@ jobs:
           BASE_COMMIT=$(git merge-base origin/main origin/${{ github.head_ref }})
           echo "BASE_COMMIT=$BASE_COMMIT" >> $GITHUB_ENV
 
-      - name: Detect merges and rebases from base branch
+      - name: Detect merge commits from ${{ github.base_ref }} into feature
         id: detect
         run: |
-          set -e
+          echo "🔍 Checking for merges from $BASE_BRANCH into $FEATURE_BRANCH since $BASE_COMMIT..."
 
-          echo "🔍 Checking for merge commits from $BASE_BRANCH into $FEATURE_BRANCH since $BASE_COMMIT"
+          MERGE_COMMITS=()
 
-          MERGE_LIST=$(git log $BASE_COMMIT..origin/$FEATURE_BRANCH --merges --oneline --grep="$BASE_BRANCH" || true)
+          for sha in $(git rev-list --merges $BASE_COMMIT..origin/$FEATURE_BRANCH); do
+            second_parent=$(git rev-parse "$sha^2")
 
-          git log origin/main..origin/$BASE_BRANCH --pretty=format:"%s" > devint_commits.txt
-          git log $BASE_COMMIT..origin/$FEATURE_BRANCH --pretty=format:"%s" > feature_commits.txt
+            if git merge-base --is-ancestor "$second_parent" origin/$BASE_BRANCH; then
+              MERGE_COMMITS+=("$sha")
+            fi
+          done
 
-          REBASED_LIST=$(grep -Ff devint_commits.txt feature_commits.txt || true)
-
-          if [[ -n "$MERGE_LIST" ]]; then
+          if [ ${#MERGE_COMMITS[@]} -gt 0 ]; then
             echo "❌ Merge commit(s) from $BASE_BRANCH detected:"
-            echo "$MERGE_LIST"
+            for sha in "${MERGE_COMMITS[@]}"; do
+              git show -s --format="• %h | %an | %ad | %s" --date=short $sha
+            done
+
+            {
+              echo "merge_list<<EOF"
+              for sha in "${MERGE_COMMITS[@]}"; do
+                git show -s --format="• %h | %an | %ad | %s" --date=short $sha
+              done
+              echo "EOF"
+            } >> $GITHUB_OUTPUT
+
+            echo "includes_base=true" >> $GITHUB_OUTPUT
             exit 1
+          else
+            echo "✅ No merge commits from $BASE_BRANCH found."
+            echo "includes_base=false" >> $GITHUB_OUTPUT
           fi
 
-          echo "✅ No merge commits found from $BASE_BRANCH."
-          echo "includes_base=false" >> $GITHUB_OUTPUT
-
-      - name: Post PR comment if needed
+      - name: Post PR comment if merge detected
         if: failure()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           REPO: ${{ github.repository }}
+          MERGE_INFO: ${{ steps.detect.outputs.merge_list }}
         run: |
           echo "💬 Posting comment to PR about invalid merge..."
           gh api -X POST /repos/$REPO/issues/$PR_NUMBER/comments \
-            -f body="❌ **Error**: Merge commits from \`${{ github.base_ref }}\` were detected in this PR. Please remove them and rebase your branch from \`main\` instead."
+            -f body="❌ **Error**: Merge commits from \`${{ github.base_ref }}\` were detected in this PR. Please remove them and rebase your branch from \`main\` instead.\n\n**Detected Merge Commits:**\n\`\`\`\n$MERGE_INFO\n\`\`\`"
+
+      - name: Send Power Automate notification
+        if: steps.detect.outputs.includes_base == 'true'
+        env:
+          POWER_WEBHOOK: ""
+          BASE: ${{ github.base_ref }}
+          HEAD: ${{ github.head_ref }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+          MERGE_INFO: ${{ steps.detect.outputs.merge_list }}
+        run: |
+          echo "📡 Sending alert to Power Automate webhook..."
+
+          curl -X POST "$POWER_WEBHOOK" \
+            -H 'Content-Type: application/json' \
+            -d "{
+              \"author\": \"$AUTHOR\",
+              \"base\": \"$BASE\",
+              \"head\": \"$HEAD\",
+              \"pr_url\": \"$PR_URL\",
+              \"merge_info\": \"$MERGE_INFO\"
+            }"
