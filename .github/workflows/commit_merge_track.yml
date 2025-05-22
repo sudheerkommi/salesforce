@@ -1,4 +1,4 @@
-name: Detect Merge/Rebase from Base Branch and Notify Team
+name: Detect Merge/Rebase from Base Branch and Notify Teams
 
 on:
   pull_request:
@@ -12,20 +12,28 @@ jobs:
       merge_list: ${{ steps.detect.outputs.merge_list }}
 
     steps:
-      # -- 1. Check out the PR code --------------------------
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # -- 2. Make sure both the PR’s base branch *and* main exist locally
-      - name: Fetch base and main branches
+      - name: Fetch all branches and refs
         run: |
-          # Pull the PR’s base branch (e.g. develop/release) and the main branch
-          git fetch origin ${{ github.base_ref }} 
-          git fetch origin main
+          git fetch --all
+          git fetch origin ${{ github.base_ref }} main
 
-      # -- 3. Detect any merges/rebases from the base branch ------------------
+      - name: Setup local main branch ref
+        run: |
+          # Force update local main branch to track origin/main
+          git branch --force main origin/main || git checkout -b main origin/main
+
+      - name: Show Git debug info
+        run: |
+          git status
+          git branch -vv
+          git rev-parse --verify main
+          git rev-parse --verify HEAD
+
       - name: Detect merges/rebases from base branch
         id: detect
         run: |
@@ -36,9 +44,7 @@ jobs:
 
           echo "🔍 Detecting merges/rebases from $BASE_BRANCH into $FEATURE_BRANCH after diverging from $MAIN_BRANCH..."
 
-          # Look for merge commits that pulled $BASE_BRANCH into the feature branch
-          merge_commits=$(git log $MAIN_BRANCH..HEAD --merges --pretty=format:"%H" \
-                           --grep="Merge branch '$BASE_BRANCH'" || true)
+          merge_commits=$(git log $MAIN_BRANCH..HEAD --merges --pretty=format:"%H" --grep="Merge branch '$BASE_BRANCH'" || true)
 
           if [ -n "$merge_commits" ]; then
             echo "Includes merge commits from $BASE_BRANCH"
@@ -50,7 +56,6 @@ jobs:
             echo "merge_list="              >> "$GITHUB_OUTPUT"
           fi
 
-      # -- 4. Comment on the PR if a merge/rebase was detected ----------------
       - name: Post PR comment on detection
         if: steps.detect.outputs.includes_base == 'true'
         env:
@@ -61,7 +66,6 @@ jobs:
           gh api -X POST /repos/$REPO/issues/$PR_NUMBER/comments \
             -f body="⚠️ **Critical Alert**: Merge/Rebase from \`${{ github.base_ref }}\` detected in this feature branch. Please review."
 
-      # -- 5. Send a detailed Microsoft Teams notification --------------------
       - name: Send detailed Teams notification on detection
         if: steps.detect.outputs.includes_base == 'true'
         env:
@@ -77,7 +81,6 @@ jobs:
         run: |
           echo "Preparing Teams notification..."
 
-          # Split comma-separated commit SHAs into an array
           IFS=',' read -r -a commits <<< "$MERGE_LIST"
 
           MERGE_COMMIT_DETAILS=""
@@ -86,7 +89,6 @@ jobs:
             MERGE_COMMIT_DETAILS="${MERGE_COMMIT_DETAILS}${commit_info}\n"
           done
 
-          # Build an Adaptive Card payload
           teams_message=$(jq -n \
             --arg pr_number "$PR_NUMBER" \
             --arg pr_title "$PR_TITLE" \
@@ -132,5 +134,4 @@ jobs:
               msteams: { width: "Full" }
             }')
 
-          # Send the card to Teams
           curl -H "Content-Type: application/json" -d "$teams_message" "$TEAMS_WEBHOOK_URL"
