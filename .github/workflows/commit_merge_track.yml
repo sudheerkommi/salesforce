@@ -34,9 +34,8 @@ jobs:
           echo "🔍 Checking for merge commits from $BASE_BRANCH into $FEATURE_BRANCH since $BASE_COMMIT"
 
           # Get merge commits with author/date/message
-          MERGE_LIST=$(git log $BASE_COMMIT..origin/$FEATURE_BRANCH \
-            --merges --grep="$BASE_BRANCH" \
-            --pretty=format:"%h | %an | %ad | %s" || true)
+          MERGE_LIST=$(git log $BASE_COMMIT..origin/$FEATURE_BRANCH --first-parent --merges --pretty=format:"%h | %an | %ad | %s" || true)
+
 
           git log origin/main..origin/$BASE_BRANCH --pretty=format:"%s" > devint_commits.txt
           git log $BASE_COMMIT..origin/$FEATURE_BRANCH --pretty=format:"%s" > feature_commits.txt
