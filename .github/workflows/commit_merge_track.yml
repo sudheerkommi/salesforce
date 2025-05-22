@@ -26,22 +26,25 @@ jobs:
         id: detect
         run: |
           set -e
-
+      
           echo "🔍 Checking for merge commits from $BASE_BRANCH into $FEATURE_BRANCH since $BASE_COMMIT"
-
-          MERGE_LIST=$(git log $BASE_COMMIT..origin/$FEATURE_BRANCH --merges --oneline --grep="$BASE_BRANCH" || true)
-
+      
+          MERGE_LIST=$(git log $BASE_COMMIT..origin/$FEATURE_BRANCH --merges --grep="$BASE_BRANCH" --pretty=format:"%h | %an | %ad | %s" || true)
+      
           git log origin/main..origin/$BASE_BRANCH --pretty=format:"%s" > devint_commits.txt
           git log $BASE_COMMIT..origin/$FEATURE_BRANCH --pretty=format:"%s" > feature_commits.txt
-
+      
           REBASED_LIST=$(grep -Ff devint_commits.txt feature_commits.txt || true)
-
+      
           if [[ -n "$MERGE_LIST" ]]; then
             echo "❌ Merge commit(s) from $BASE_BRANCH detected:"
             echo "$MERGE_LIST"
+            echo "merge_list<<EOF" >> $GITHUB_OUTPUT
+            echo "$MERGE_LIST" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
             exit 1
           fi
-
+      
           echo "✅ No merge commits found from $BASE_BRANCH."
           echo "includes_base=false" >> $GITHUB_OUTPUT
 
