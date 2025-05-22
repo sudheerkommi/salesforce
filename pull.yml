@@ -17,8 +17,10 @@ jobs:
         with:
           fetch-depth: 0
 
+
       - name: Fetch base branch
-        run: git fetch origin ${{ github.base_ref }}
+        run: git fetch origin ${{ github.base_ref }} --depth=0
+             git fetch origin main --depth=0
 
       - name: Detect merges/rebases from base branch
         id: detect
