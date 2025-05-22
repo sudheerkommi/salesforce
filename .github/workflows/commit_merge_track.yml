@@ -58,7 +58,7 @@ jobs:
           fi
 
       - name: Post PR comment if merge detected
-        if: steps.detect.outputs.includes_base == 'true'
+        # if: steps.detect.outputs.includes_base == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
