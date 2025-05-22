@@ -1,0 +1,7 @@
+{
+  "author": "username",
+  "base": "devint",
+  "head": "feature/abc",
+  "pr_url": "https://github.com/org/repo/pull/123",
+  "merge_info": "• abc123 | user | 2024-05-21 | Merge branch 'devint' into feature/abc"
+}
