@@ -1,0 +1,10 @@
+### 🚨 Merge Alert
+
+**Author:** @{outputs('Parse_JSON')?['body/author']}  
+**Base Branch:** @{outputs('Parse_JSON')?['body/base']}  
+**Feature Branch:** @{outputs('Parse_JSON')?['body/head']}  
+**Pull Request:** [View PR](@{outputs('Parse_JSON')?['body/pr_url']})
+
+---
+
+**❗ Detected Merge Commits:**
