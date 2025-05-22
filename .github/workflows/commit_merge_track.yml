@@ -68,3 +68,25 @@ jobs:
           echo "💬 Posting comment to PR about invalid merge..."
           gh api -X POST /repos/$REPO/issues/$PR_NUMBER/comments \
             -f body="❌ **Error**: Merge commits from \`${{ github.base_ref }}\` were detected in this PR. Please remove them and rebase your branch from \`main\` instead.\n\n**Detected Merge Commits:**\n\`\`\`\n$MERGE_INFO\n\`\`\`"
+
+      - name: Send Power Automate notification
+        if: steps.detect.outputs.includes_base == 'true'
+        env:
+          POWER_WEBHOOK: ""
+          BASE: ${{ github.base_ref }}
+          HEAD: ${{ github.head_ref }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+          MERGE_INFO: ${{ steps.detect.outputs.merge_list }}
+        run: |
+          echo "📡 Sending alert to Power Automate webhook..."
+
+          curl -X POST "$POWER_WEBHOOK" \
+            -H 'Content-Type: application/json' \
+            -d "{
+              \"author\": \"$AUTHOR\",
+              \"base\": \"$BASE\",
+              \"head\": \"$HEAD\",
+              \"pr_url\": \"$PR_URL\",
+              \"merge_info\": \"$MERGE_INFO\"
+            }"
