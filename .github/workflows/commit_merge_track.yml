@@ -6,7 +6,7 @@ on:
 
 permissions:
   contents: read
-  pull-requests: write  # Required for commenting via gh CLI
+  pull-requests: write
 
 jobs:
   detect-conflict-merge-message:
@@ -16,7 +16,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Ensure full history for git log
+          fetch-depth: 0
 
       - name: Get branch info
         id: vars
@@ -35,7 +35,6 @@ jobs:
 
           for sha in $(git rev-list --merges $BASE_COMMIT..origin/$FEATURE_BRANCH); do
             second_parent=$(git rev-parse "$sha^2")
-
             if git merge-base --is-ancestor "$second_parent" origin/$BASE_BRANCH; then
               MERGE_COMMITS+=("$sha")
             fi
@@ -47,12 +46,28 @@ jobs:
               git show -s --format="• %h | %an | %ad | %s" --date=short $sha
             done
 
+            FIRST_SHA="${MERGE_COMMITS[0]}"
+            AUTHOR=$(git show -s --format="%an" $FIRST_SHA)
+            DATE=$(git show -s --format="%cI" $FIRST_SHA)
+            PARENT1=$(git rev-parse "$FIRST_SHA^1")
+            PARENT2=$(git rev-parse "$FIRST_SHA^2")
+            MESSAGE=$(git show -s --format="%s" $FIRST_SHA)
+            REPO_URL="https://github.com/${{ github.repository }}"
+            COMMIT_URL="$REPO_URL/commit/$FIRST_SHA"
+
             {
               echo "merge_list<<EOF"
               for sha in "${MERGE_COMMITS[@]}"; do
                 git show -s --format="• %h | %an | %ad | %s" --date=short $sha
               done
               echo "EOF"
+              echo "merge_commit=$FIRST_SHA"
+              echo "merge_author=$AUTHOR"
+              echo "merge_date=$DATE"
+              echo "merge_message=$MESSAGE"
+              echo "parent1=$PARENT1"
+              echo "parent2=$PARENT2"
+              echo "commit_url=$COMMIT_URL"
             } >> $GITHUB_OUTPUT
 
             echo "includes_base=true" >> $GITHUB_OUTPUT
@@ -77,12 +92,19 @@ jobs:
       - name: Send Power Automate notification
         if: steps.detect.outputs.includes_base == 'true'
         env:
-          POWER_WEBHOOK: ""
+          POWER_WEBHOOK: ${{ secrets.POWER_AUTOMATE_WEBHOOK }}
           BASE: ${{ github.base_ref }}
           HEAD: ${{ github.head_ref }}
           PR_URL: ${{ github.event.pull_request.html_url }}
           AUTHOR: ${{ github.event.pull_request.user.login }}
           MERGE_INFO: ${{ steps.detect.outputs.merge_list }}
+          MERGE_COMMIT: ${{ steps.detect.outputs.merge_commit }}
+          MERGE_AUTHOR: ${{ steps.detect.outputs.merge_author }}
+          MERGE_DATE: ${{ steps.detect.outputs.merge_date }}
+          MERGE_MESSAGE: ${{ steps.detect.outputs.merge_message }}
+          PARENT1: ${{ steps.detect.outputs.parent1 }}
+          PARENT2: ${{ steps.detect.outputs.parent2 }}
+          COMMIT_URL: ${{ steps.detect.outputs.commit_url }}
         run: |
           echo "📡 Sending alert to Power Automate webhook..."
 
@@ -93,5 +115,12 @@ jobs:
               \"base\": \"$BASE\",
               \"head\": \"$HEAD\",
               \"pr_url\": \"$PR_URL\",
-              \"merge_info\": \"$MERGE_INFO\"
+              \"merge_info\": \"$MERGE_INFO\",
+              \"merge_commit\": \"$MERGE_COMMIT\",
+              \"merge_author\": \"$MERGE_AUTHOR\",
+              \"merge_date\": \"$MERGE_DATE\",
+              \"merge_message\": \"$MERGE_MESSAGE\",
+              \"parent1\": \"$PARENT1\",
+              \"parent2\": \"$PARENT2\",
+              \"commit_url\": \"$COMMIT_URL\"
             }"
