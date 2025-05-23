@@ -1,0 +1,58 @@
+{
+  "type": "object",
+  "properties": {
+    "author": {
+      "type": "string"
+    },
+    "base": {
+      "type": "string"
+    },
+    "head": {
+      "type": "string"
+    },
+    "pr_url": {
+      "type": "string",
+      "format": "uri"
+    },
+    "merge_info": {
+      "type": "string"
+    },
+    "merge_commit": {
+      "type": "string"
+    },
+    "merge_author": {
+      "type": "string"
+    },
+    "merge_date": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "merge_message": {
+      "type": "string"
+    },
+    "parent1": {
+      "type": "string"
+    },
+    "parent2": {
+      "type": "string"
+    },
+    "commit_url": {
+      "type": "string",
+      "format": "uri"
+    }
+  },
+  "required": [
+    "author",
+    "base",
+    "head",
+    "pr_url",
+    "merge_info",
+    "merge_commit",
+    "merge_author",
+    "merge_date",
+    "merge_message",
+    "parent1",
+    "parent2",
+    "commit_url"
+  ]
+}
