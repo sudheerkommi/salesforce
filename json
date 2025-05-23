@@ -1,0 +1,85 @@
+{
+  "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+  "type": "AdaptiveCard",
+  "version": "1.5",
+  "body": [
+    {
+      "type": "Container",
+      "style": "attention",
+      "bleed": true,
+      "items": [
+        {
+          "type": "TextBlock",
+          "text": "🚨 Merge Commit Detected",
+          "weight": "Bolder",
+          "size": "ExtraLarge",
+          "wrap": true
+        },
+        {
+          "type": "TextBlock",
+          "text": "An integration branch has been merged into a feature branch. This requires immediate attention from DevOps.",
+          "wrap": true
+        }
+      ]
+    },
+    {
+      "type": "FactSet",
+      "facts": [
+        {
+          "title": "👤 Author",
+          "value": "@{triggerBody()?['author']}"
+        },
+        {
+          "title": "🔁 Base Branch",
+          "value": "@{triggerBody()?['base']}"
+        },
+        {
+          "title": "🌿 Feature Branch",
+          "value": "@{triggerBody()?['head']}"
+        },
+        {
+          "title": "🕒 Merge Date",
+          "value": "@{triggerBody()?['merge_date']}"
+        }
+      ]
+    },
+    {
+      "type": "TextBlock",
+      "text": "🧾 Merge Commit Info",
+      "wrap": true,
+      "weight": "Bolder",
+      "spacing": "Medium"
+    },
+    {
+      "type": "TextBlock",
+      "text": "@{triggerBody()?['merge_info']}",
+      "wrap": true,
+      "fontType": "Monospace"
+    },
+    {
+      "type": "TextBlock",
+      "text": "⚠️ Action Required: Please revert the merge commit from the feature branch as per release hygiene protocols.",
+      "wrap": true,
+      "color": "Warning",
+      "weight": "Bolder",
+      "spacing": "Medium"
+    }
+  ],
+  "actions": [
+    {
+      "type": "Action.OpenUrl",
+      "title": "🔗 View Pull Request",
+      "url": "@{triggerBody()?['pr_url']}"
+    },
+    {
+      "type": "Action.OpenUrl",
+      "title": "🔍 View Merge Commit",
+      "url": "@{triggerBody()?['commit_url']}"
+    },
+    {
+      "type": "Action.OpenUrl",
+      "title": "📜 View Commit History",
+      "url": "https://github.com/your-org/your-repo/commits/@{triggerBody()?['head']}"
+    }
+  ]
+}
