@@ -1,1 +1,2 @@
-Resolved content combining both changes
+This is the conflicting change in main
+hal
