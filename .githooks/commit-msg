@@ -1,0 +1,15 @@
+#!/bin/bash
+
+COMMIT_MSG_FILE=$1
+
+# Read commit message
+commit_msg=$(cat "$COMMIT_MSG_FILE")
+
+# Block "merge branch" or any word 'merge' (case-insensitive)
+if echo "$commit_msg" | grep -iqE '\bmerge\b|\bmerge branch\b'; then
+  echo "❌ Commit message contains forbidden word: 'merge'"
+  echo "🔒 Please use rebase instead of merge commits."
+  exit 1
+fi
+
+exit 0

@@ -1,0 +1,20 @@
+#!/bin/bash
+
+# Get the latest commit message from the staged commit
+commit_msg=$(git log -1 --pretty=%s)
+lower_msg=$(echo "$commit_msg" | tr '[:upper:]' '[:lower:]')
+
+echo "🔍 Checking commit message: $commit_msg"
+
+if echo "$commit_msg" | grep -qE "^Merge branch '.*' into .*"; then
+  echo "❌ GitHub-style merge commit detected."
+  echo "🔒 Please resolve conflicts using 'git rebase' instead of merge."
+  exit 1
+elif echo "$lower_msg" | grep -q "merge"; then
+  echo "❌ Commit message contains the word 'merge'."
+  echo "🔒 Merge commits are not allowed."
+  exit 1
+fi
+
+echo "✅ Commit message is clean."
+exit 0
