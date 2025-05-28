@@ -1,3 +1,2 @@
 This is the conflicting change in main
 hal
-"url": "@{concat('https://github.com/acme-corp/frontend-app/commits/', triggerBody()?['head'])}"
