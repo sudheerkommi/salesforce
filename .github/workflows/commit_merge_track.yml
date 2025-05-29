@@ -24,6 +24,7 @@ jobs:
           echo "BASE_BRANCH=${{ github.base_ref }}" >> $GITHUB_ENV
           echo "FEATURE_BRANCH=${{ github.head_ref }}" >> $GITHUB_ENV
           BASE_COMMIT=$(git merge-base origin/main origin/${{ github.head_ref }})
+          echo "Base Commit is $BASE_COMMIT "
           echo "BASE_COMMIT=$BASE_COMMIT" >> $GITHUB_ENV
 
       - name: Detect merge commits from ${{ github.base_ref }} into feature
