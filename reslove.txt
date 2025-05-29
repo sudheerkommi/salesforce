@@ -1,2 +1,127 @@
-Hello from main branch
-123
+name: Detect Merge from Base Branch and Notify Teams
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  detect-merge-from-base:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect merge from base branch
+        id: detect
+        run: |
+          echo "🔍 Checking for merge commits from base branch after common ancestor..."
+
+          BASE_BRANCH="${{ github.base_ref }}"
+          HEAD_BRANCH="${{ github.head_ref }}"
+
+          git fetch origin "$BASE_BRANCH" "$HEAD_BRANCH"
+
+          COMMON=$(git merge-base origin/"$BASE_BRANCH" origin/"$HEAD_BRANCH")
+          echo "Common ancestor: $COMMON"
+
+          COMMITS=$(git rev-list "$COMMON"..origin/"$HEAD_BRANCH")
+          MERGES_FROM_BASE=""
+          FIRST_MERGE_COMMIT=""
+          for COMMIT in $COMMITS; do
+            PARENTS=$(git rev-list --parents -n 1 "$COMMIT")
+            COUNT=$(echo "$PARENTS" | wc -w)
+            if [ "$COUNT" -eq 3 ]; then
+              PARENT1=$(echo $PARENTS | cut -d' ' -f2)
+              PARENT2=$(echo $PARENTS | cut -d' ' -f3)
+
+              if git merge-base --is-ancestor "$PARENT1" origin/"$BASE_BRANCH" || git merge-base --is-ancestor "$PARENT2" origin/"$BASE_BRANCH"; then
+                DESC=$(git log -1 --pretty=format:"• %h | %an | %ad | %s" --date=short "$COMMIT")
+                MERGES_FROM_BASE="${MERGES_FROM_BASE}${DESC}\n"
+
+                # Capture detailed info for first merge only
+                if [ -z "$FIRST_MERGE_COMMIT" ]; then
+                  FIRST_MERGE_COMMIT="$COMMIT"
+                  MERGE_AUTHOR=$(git log -1 --pretty=format:"%an" "$COMMIT")
+                  MERGE_DATE=$(git log -1 --pretty=format:"%ad" --date=iso "$COMMIT")
+                  MERGE_MESSAGE=$(git log -1 --pretty=format:"%s" "$COMMIT")
+                  COMMIT_URL="https://github.com/${{ github.repository }}/commit/$COMMIT"
+                  echo "merge_commit=$COMMIT" >> $GITHUB_OUTPUT
+                  echo "merge_author=$MERGE_AUTHOR" >> $GITHUB_OUTPUT
+                  echo "merge_date=$MERGE_DATE" >> $GITHUB_OUTPUT
+                  echo "merge_message=$MERGE_MESSAGE" >> $GITHUB_OUTPUT
+                  echo "parent1=$PARENT1" >> $GITHUB_OUTPUT
+                  echo "parent2=$PARENT2" >> $GITHUB_OUTPUT
+                  echo "commit_url=$COMMIT_URL" >> $GITHUB_OUTPUT
+                fi
+              fi
+            fi
+          done
+
+          if [ -n "$MERGES_FROM_BASE" ]; then
+            echo "❌ Merge(s) from $BASE_BRANCH detected:"
+            echo -e "$MERGES_FROM_BASE"
+            echo "merge_detected=true" >> $GITHUB_OUTPUT
+            echo "merge_list<<EOF" >> $GITHUB_OUTPUT
+            echo -e "$MERGES_FROM_BASE" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+            exit 1
+          else
+            echo "✅ No merges from $BASE_BRANCH detected."
+            echo "merge_detected=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Post PR comment if merge from base detected
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+          MERGE_INFO: ${{ steps.detect.outputs.merge_list }}
+          BASE: ${{ github.base_ref }}
+        run: |
+          echo "💬 Posting comment to PR about invalid merge from $BASE..."
+          gh api -X POST /repos/$REPO/issues/$PR_NUMBER/comments \
+            -f body="❌ **Merge from \`$BASE\` detected** in this PR. Please rebase your branch instead.\n\n**Detected Merge Commit(s):**\n\`\`\`\n$MERGE_INFO\n\`\`\`"
+
+      - name: Send Power Automate notification
+        if: failure()
+        env:
+          POWER_WEBHOOK: ${{ secrets.POWER_AUTOMATE_WEBHOOK }}
+          BASE: ${{ github.base_ref }}
+          HEAD: ${{ github.head_ref }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+          MERGE_INFO: ${{ steps.detect.outputs.merge_list }}
+          MERGE_COMMIT: ${{ steps.detect.outputs.merge_commit }}
+          MERGE_AUTHOR: ${{ steps.detect.outputs.merge_author }}
+          MERGE_DATE: ${{ steps.detect.outputs.merge_date }}
+          MERGE_MESSAGE: ${{ steps.detect.outputs.merge_message }}
+          PARENT1: ${{ steps.detect.outputs.parent1 }}
+          PARENT2: ${{ steps.detect.outputs.parent2 }}
+          COMMIT_URL: ${{ steps.detect.outputs.commit_url }}
+        run: |
+          echo "📡 Sending alert to Power Automate webhook..."
+
+          curl -X POST "$POWER_WEBHOOK" \
+            -H 'Content-Type: application/json' \
+            -d "{
+              \"author\": \"$AUTHOR\",
+              \"base\": \"$BASE\",
+              \"head\": \"$HEAD\",
+              \"pr_url\": \"$PR_URL\",
+              \"merge_info\": \"$MERGE_INFO\",
+              \"merge_commit\": \"$MERGE_COMMIT\",
+              \"merge_author\": \"$MERGE_AUTHOR\",
+              \"merge_date\": \"$MERGE_DATE\",
+              \"merge_message\": \"$MERGE_MESSAGE\",
+              \"parent1\": \"$PARENT1\",
+              \"parent2\": \"$PARENT2\",
+              \"commit_url\": \"$COMMIT_URL\"
+            }"
