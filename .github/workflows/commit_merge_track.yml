@@ -18,64 +18,33 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Get branch info
-        id: vars
+      - name: Determine merge commits after common ancestor
         run: |
-          echo "BASE_BRANCH=${{ github.base_ref }}" >> $GITHUB_ENV
-          echo "FEATURE_BRANCH=${{ github.head_ref }}" >> $GITHUB_ENV
-          BASE_COMMIT=$(git merge-base origin/main origin/${{ github.head_ref }})
-          echo "Base Commit is $BASE_COMMIT "
-          echo "BASE_COMMIT=$BASE_COMMIT" >> $GITHUB_ENV
+          echo "🔍 Checking for merge commits after common ancestor..."
 
-      - name: Detect merge commits from ${{ github.base_ref }} into feature
-        id: detect
-        run: |
-          echo "🔍 Checking for merges from $BASE_BRANCH into $FEATURE_BRANCH since $BASE_COMMIT..."
+          BASE_BRANCH="${{ github.base_ref }}"
+          HEAD_BRANCH="${{ github.head_ref }}"
 
-          MERGE_COMMITS=()
+          echo "Base: $BASE_BRANCH"
+          echo "Head: $HEAD_BRANCH"
 
-          for sha in $(git rev-list --merges $BASE_COMMIT..origin/$FEATURE_BRANCH); do
-            second_parent=$(git rev-parse "$sha^2")
-            if git merge-base --is-ancestor "$second_parent" origin/$BASE_BRANCH; then
-              MERGE_COMMITS+=("$sha")
-            fi
-          done
+          # Fetch both branches
+          git fetch origin "$BASE_BRANCH" "$HEAD_BRANCH"
 
-          if [ ${#MERGE_COMMITS[@]} -gt 0 ]; then
-            echo "❌ Merge commit(s) from $BASE_BRANCH detected:"
-            for sha in "${MERGE_COMMITS[@]}"; do
-              git show -s --format="• %h | %an | %ad | %s" --date=short $sha
-            done
+          # Find common ancestor
+          COMMON=$(git merge-base origin/"$BASE_BRANCH" origin/"$HEAD_BRANCH")
 
-            FIRST_SHA="${MERGE_COMMITS[0]}"
-            AUTHOR=$(git show -s --format="%an" $FIRST_SHA)
-            DATE=$(git show -s --format="%cI" $FIRST_SHA)
-            PARENT1=$(git rev-parse "$FIRST_SHA^1")
-            PARENT2=$(git rev-parse "$FIRST_SHA^2")
-            MESSAGE=$(git show -s --format="%s" $FIRST_SHA)
-            REPO_URL="https://github.com/${{ github.repository }}"
-            COMMIT_URL="$REPO_URL/commit/$FIRST_SHA"
+          echo "Common ancestor: $COMMON"
 
-            {
-              echo "merge_list<<EOF"
-              for sha in "${MERGE_COMMITS[@]}"; do
-                git show -s --format="• %h | %an | %ad | %s" --date=short $sha
-              done
-              echo "EOF"
-              echo "merge_commit=$FIRST_SHA"
-              echo "merge_author=$AUTHOR"
-              echo "merge_date=$DATE"
-              echo "merge_message=$MESSAGE"
-              echo "parent1=$PARENT1"
-              echo "parent2=$PARENT2"
-              echo "commit_url=$COMMIT_URL"
-            } >> $GITHUB_OUTPUT
+          # Find merge commits on first-parent path after the common ancestor
+          MERGES=$(git log --merges --first-parent --pretty=format:"• %h | %an | %ad | %s" --date=short "$COMMON..origin/$HEAD_BRANCH")
 
-            echo "includes_base=true" >> $GITHUB_OUTPUT
+          if [ -n "$MERGES" ]; then
+            echo "❌ Merge commit(s) found:"
+            echo "$MERGES"
             exit 1
           else
-            echo "✅ No merge commits from $BASE_BRANCH found."
-            echo "includes_base=false" >> $GITHUB_OUTPUT
+            echo "✅ No merge commits found on first-parent path after $COMMON."
           fi
 
       - name: Post PR comment if merge detected
