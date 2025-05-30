@@ -90,8 +90,7 @@ jobs:
         run: |
           echo "💬 Posting comment to PR about invalid merge..."
           gh api -X POST /repos/$REPO/issues/$PR_NUMBER/comments \
-            -f body="❌ **Error**: Merge commits from \`${{ github.base_ref }}\` were detected in this PR. Please remove them and rebase your branch from \`main\` instead.\n\n**Detected Merge Commits:**\n\`\`\`\n$MERGE_INFO\n\`\`\`"
-
+            -f body="❌ **Error**: Merge commits from \`${{ github.base_ref }}\` were detected in this PR.Please reach out to Devopts team immediately before promoting the user story
       - name: Send Power Automate notification
         if: failure()
         env:
